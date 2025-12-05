@@ -209,6 +209,21 @@ def _load_raw_schema() -> Tuple[Dict[str, Any], Path]:
     return data, schema_path
 
 
+def _format_path(path: tuple[str, ...], key: str | None = None) -> str:
+    """Format a schema path tuple into a dot-separated string.
+
+    Args:
+        path: Tuple of keys representing the path in the schema tree.
+        key: Optional additional key to append to the path.
+
+    Returns:
+        Dot-separated string representation of the path.
+    """
+    if key is not None:
+        return ".".join(path + (key,))
+    return ".".join(path)
+
+
 def _compile_schema_tree(
     node: MutableMapping[str, Any],
     path: Tuple[str, ...],
@@ -229,7 +244,7 @@ def _compile_schema_tree(
         problems.append(
             SchemaProblem(
                 f"Schema nesting depth exceeds maximum allowed depth of "
-                f"{MAX_SCHEMA_DEPTH} at path {'.'.join(path)}"
+                f"{MAX_SCHEMA_DEPTH} at path {_format_path(path)}"
             ),
         )
         return
@@ -238,7 +253,7 @@ def _compile_schema_tree(
         if not isinstance(value, Mapping):
             problems.append(
                 SchemaProblem(
-                    f"Invalid schema at {'.'.join(path + (key,))}: expected object"
+                    f"Invalid schema at {_format_path(path, key)}: expected object"
                 ),
             )
             continue
@@ -259,7 +274,7 @@ def _compile_schema_tree(
             if type_invalid:
                 problems.append(
                     SchemaProblem(
-                        f"Incomplete leaf at {'.'.join(path + (key,))}: "
+                        f"Incomplete leaf at {_format_path(path, key)}: "
                         f"type cannot be None or empty",
                     ),
                 )
@@ -267,7 +282,7 @@ def _compile_schema_tree(
             if source_invalid:
                 problems.append(
                     SchemaProblem(
-                        f"Incomplete leaf at {'.'.join(path + (key,))}: "
+                        f"Incomplete leaf at {_format_path(path, key)}: "
                         f"source cannot be None or empty",
                     ),
                 )
@@ -279,7 +294,7 @@ def _compile_schema_tree(
             if expected_type is None:
                 problems.append(
                     SchemaProblem(
-                        f"Unknown type '{leaf_type}' at {'.'.join(path + (key,))}",
+                        f"Unknown type '{leaf_type}' at {_format_path(path, key)}",
                     ),
                 )
                 continue
@@ -295,7 +310,7 @@ def _compile_schema_tree(
                 if item_type_invalid:
                     problems.append(
                         SchemaProblem(
-                            f"Incomplete leaf at {'.'.join(path + (key,))}: "
+                            f"Incomplete leaf at {_format_path(path, key)}: "
                             f"item_type is required for list type and "
                             f"cannot be None or empty",
                         ),
@@ -308,7 +323,7 @@ def _compile_schema_tree(
                     problems.append(
                         SchemaProblem(
                             f"Invalid item_type '{item_type_name}' at "
-                            f"{'.'.join(path + (key,))}: only primitive item types "
+                            f"{_format_path(path, key)}: only primitive item types "
                             f"('str', 'int', 'float', 'bool') are allowed for lists",
                         ),
                     )
