@@ -236,6 +236,94 @@ def _is_empty_or_none(value: Any) -> bool:
     return value is None or (isinstance(value, str) and value.strip() == "")
 
 
+def _validate_and_create_leaf(
+    value_dict: dict[str, Any],
+    path: tuple[str, ...],
+    key: str,
+    problems: list[SchemaProblem],
+) -> SchemaLeaf | None:
+    """Validate a leaf node and create SchemaLeaf if valid.
+
+    Args:
+        value_dict: Dictionary containing leaf node data.
+        path: Current path in the schema tree.
+        key: Current key being processed.
+        problems: List to collect validation problems.
+
+    Returns:
+        SchemaLeaf if validation passes, None otherwise.
+    """
+    leaf_type = value_dict.get("type")
+    leaf_source = value_dict.get("source")
+
+    # This is supposed to be a leaf - validate required fields first.
+    type_invalid = _is_empty_or_none(leaf_type)
+    source_invalid = _is_empty_or_none(leaf_source)
+
+    if type_invalid:
+        problems.append(
+            SchemaProblem(
+                f"Incomplete leaf at {_format_path(path, key)}: "
+                f"type cannot be None or empty",
+            ),
+        )
+
+    if source_invalid:
+        problems.append(
+            SchemaProblem(
+                f"Incomplete leaf at {_format_path(path, key)}: "
+                f"source cannot be None or empty",
+            ),
+        )
+
+    if type_invalid or source_invalid:
+        return None
+
+    expected_type = _TYPE_MAP.get(str(leaf_type))
+    if expected_type is None:
+        problems.append(
+            SchemaProblem(
+                f"Unknown type '{leaf_type}' at {_format_path(path, key)}",
+            ),
+        )
+        return None
+
+    item_expected_type: type | None = None
+    # For list-typed leaves we require an explicit, primitive item_type
+    # to ensure element homogeneity (e.g. list[str], list[int]).
+    if expected_type is list:
+        item_type_name = value_dict.get("item_type")
+        item_type_invalid = _is_empty_or_none(item_type_name)
+        if item_type_invalid:
+            problems.append(
+                SchemaProblem(
+                    f"Incomplete leaf at {_format_path(path, key)}: "
+                    f"item_type is required for list type and "
+                    f"cannot be None or empty",
+                ),
+            )
+            return None
+
+        item_expected_type = _TYPE_MAP.get(str(item_type_name))
+        # Item type must be a primitive (str, int, float, bool), not list
+        if item_expected_type is None or item_expected_type is list:
+            problems.append(
+                SchemaProblem(
+                    f"Invalid item_type '{item_type_name}' at "
+                    f"{_format_path(path, key)}: only primitive item types "
+                    f"('str', 'int', 'float', 'bool') are allowed for lists",
+                ),
+            )
+            return None
+
+    return SchemaLeaf(
+        path=path + (key,),
+        source=str(leaf_source),
+        expected_type=expected_type,
+        item_expected_type=item_expected_type,
+    )
+
+
 def _compile_schema_tree(
     node: MutableMapping[str, Any],
     path: tuple[str, ...],
@@ -275,72 +363,9 @@ def _compile_schema_tree(
         leaf_source = value_dict.get("source")
 
         if leaf_type is not None or leaf_source is not None:
-            # This is supposed to be a leaf - validate required fields first.
-            type_invalid = _is_empty_or_none(leaf_type)
-            source_invalid = _is_empty_or_none(leaf_source)
-
-            if type_invalid:
-                problems.append(
-                    SchemaProblem(
-                        f"Incomplete leaf at {_format_path(path, key)}: "
-                        f"type cannot be None or empty",
-                    ),
-                )
-
-            if source_invalid:
-                problems.append(
-                    SchemaProblem(
-                        f"Incomplete leaf at {_format_path(path, key)}: "
-                        f"source cannot be None or empty",
-                    ),
-                )
-
-            if type_invalid or source_invalid:
-                continue
-
-            expected_type = _TYPE_MAP.get(str(leaf_type))
-            if expected_type is None:
-                problems.append(
-                    SchemaProblem(
-                        f"Unknown type '{leaf_type}' at {_format_path(path, key)}",
-                    ),
-                )
-                continue
-
-            item_expected_type: type | None = None
-            # For list-typed leaves we require an explicit, primitive item_type
-            # to ensure element homogeneity (e.g. list[str], list[int]).
-            if expected_type is list:
-                item_type_name = value_dict.get("item_type")
-                item_type_invalid = _is_empty_or_none(item_type_name)
-                if item_type_invalid:
-                    problems.append(
-                        SchemaProblem(
-                            f"Incomplete leaf at {_format_path(path, key)}: "
-                            f"item_type is required for list type and "
-                            f"cannot be None or empty",
-                        ),
-                    )
-                    continue
-
-                item_expected_type = _TYPE_MAP.get(str(item_type_name))
-                # Item type must be a primitive (str, int, float, bool), not list
-                if item_expected_type is None or item_expected_type is list:
-                    problems.append(
-                        SchemaProblem(
-                            f"Invalid item_type '{item_type_name}' at "
-                            f"{_format_path(path, key)}: only primitive item types "
-                            f"('str', 'int', 'float', 'bool') are allowed for lists",
-                        ),
-                    )
-                    continue
-
-            yield SchemaLeaf(
-                path=path + (key,),
-                source=str(leaf_source),
-                expected_type=expected_type,
-                item_expected_type=item_expected_type,
-            )
+            leaf = _validate_and_create_leaf(value_dict, path, key, problems)
+            if leaf is not None:
+                yield leaf
         else:
             # This is an inner node; recurse into children.
             for child_leaf in _compile_schema_tree(value_dict, path + (key,), problems):
