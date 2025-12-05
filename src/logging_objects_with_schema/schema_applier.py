@@ -7,7 +7,7 @@ to user-provided extra fields, used by SchemaLogger.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Dict, List, Mapping, MutableMapping, Tuple
+from typing import Any, Mapping, MutableMapping
 
 from .errors import DataProblem
 from .schema_loader import CompiledSchema, SchemaLeaf
@@ -59,7 +59,7 @@ def _validate_list_value(
 
 def _set_nested_value(
     target: MutableMapping[str, Any],
-    path: Tuple[str, ...],
+    path: tuple[str, ...],
     value: Any,
 ) -> None:
     """Set a value in a nested dictionary structure following the given path.
@@ -88,7 +88,7 @@ def _validate_and_apply_leaf(
     value: Any,
     source: str,
     extra: MutableMapping[str, Any],
-    problems: List[DataProblem],
+    problems: list[DataProblem],
 ) -> None:
     """Validate a value against a schema leaf and apply it if valid.
 
@@ -156,7 +156,7 @@ def _strip_empty(node: Any) -> Any:
 def _apply_schema_internal(
     compiled: CompiledSchema,
     extra_values: Mapping[str, Any],
-) -> Tuple[Dict[str, Any], List[DataProblem]]:
+) -> tuple[dict[str, Any], list[DataProblem]]:
     """Internal function to build structured ``extra`` from compiled schema.
 
     The function applies a :class:`CompiledSchema` to user-provided ``extra``
@@ -202,15 +202,15 @@ def _apply_schema_internal(
         change between releases without preserving backward compatibility.
 
     Returns:
-        Tuple of (structured_extra, List[DataProblem]).
+        Tuple of (structured_extra, list[DataProblem]).
     """
-    extra: Dict[str, Any] = {}
-    problems: List[DataProblem] = []
+    extra: dict[str, Any] = {}
+    problems: list[DataProblem] = []
 
     used_sources = {leaf.source for leaf in compiled.leaves}
 
     # Group leaves by source for efficient processing
-    source_to_leaves: Dict[str, List[SchemaLeaf]] = defaultdict(list)
+    source_to_leaves: dict[str, list[SchemaLeaf]] = defaultdict(list)
     for leaf in compiled.leaves:
         source_to_leaves[leaf.source].append(leaf)
 
