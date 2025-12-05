@@ -1,0 +1,625 @@
+"""Direct tests for schema_applier module functionality.
+
+These tests cover the apply_schema_internal function and strip_empty
+functionality directly, without going through SchemaLogger.
+"""
+
+from __future__ import annotations
+
+from logging_objects_with_schema.schema_applier import (
+    _apply_schema_internal as apply_schema_internal,
+)
+from logging_objects_with_schema.schema_applier import _strip_empty as strip_empty
+from logging_objects_with_schema.schema_loader import CompiledSchema, SchemaLeaf
+
+
+def test_strip_empty_removes_empty_dicts() -> None:
+    """strip_empty should remove empty dictionaries."""
+    input_data = {
+        "a": 1,
+        "b": {},
+        "c": {"d": {}, "e": 2},
+    }
+    result = strip_empty(input_data)
+    assert result == {"a": 1, "c": {"e": 2}}
+
+
+def test_strip_empty_removes_none_values() -> None:
+    """strip_empty should remove None values."""
+    input_data = {
+        "a": 1,
+        "b": None,
+        "c": {"d": None, "e": 2},
+    }
+    result = strip_empty(input_data)
+    assert result == {"a": 1, "c": {"e": 2}}
+
+
+def test_strip_empty_handles_nested_empty_dicts() -> None:
+    """strip_empty should handle deeply nested empty dictionaries."""
+    input_data = {
+        "a": {
+            "b": {
+                "c": {},
+            },
+            "d": 1,
+        },
+    }
+    result = strip_empty(input_data)
+    assert result == {"a": {"d": 1}}
+
+
+def test_strip_empty_preserves_non_dict_values() -> None:
+    """strip_empty should preserve non-dict values including empty lists."""
+    input_data = {
+        "a": [],
+        "b": [1, 2, 3],
+        "c": "string",
+        "d": 42,
+    }
+    result = strip_empty(input_data)
+    assert result == input_data
+
+
+def test_apply_schema_empty_schema_returns_empty() -> None:
+    """apply_schema_internal with empty schema should return empty dict and problems."""
+    schema = CompiledSchema(leaves=[])
+    extra = {"field1": "value1", "field2": 42}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    # All fields are considered redundant even when schema has no leaves.
+    problem_messages = [p.message for p in problems]
+    assert (
+        "Field 'field1' is not defined in schema and will be ignored"
+        in problem_messages
+    )
+    assert (
+        "Field 'field2' is not defined in schema and will be ignored"
+        in problem_messages
+    )
+
+
+def test_apply_schema_nested_structure() -> None:
+    """apply_schema_internal should build nested structures correctly."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "Metrics", "CPU"),
+                source="cpu_usage",
+                expected_type=float,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "Metrics", "Memory"),
+                source="memory_usage",
+                expected_type=float,
+            ),
+        ],
+    )
+    extra = {
+        "request_id": "abc-123",
+        "cpu_usage": 75.5,
+        "memory_usage": 60.2,
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "RequestID": "abc-123",
+            "Metrics": {
+                "CPU": 75.5,
+                "Memory": 60.2,
+            },
+        },
+    }
+    assert problems == []
+
+
+def test_apply_schema_multiple_leaves_same_source_same_type() -> None:
+    """Multiple leaves with same source and type should write to all locations."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "Metadata", "ID"),
+                source="request_id",
+                expected_type=str,
+            ),
+        ],
+    )
+    extra = {"request_id": "abc-123"}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "RequestID": "abc-123",
+            "Metadata": {
+                "ID": "abc-123",
+            },
+        },
+    }
+    assert problems == []
+
+
+def test_apply_schema_multiple_leaves_same_source_different_types() -> None:
+    """Multiple leaves with same source but different types validate independently."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"), source="id", expected_type=str
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "IDNumber"), source="id", expected_type=int
+            ),
+        ],
+    )
+    extra = {"id": "abc-123"}
+    result, problems = apply_schema_internal(schema, extra)
+    # Should only write to str location
+    assert result == {
+        "ServicePayload": {
+            "RequestID": "abc-123",
+        },
+    }
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+
+
+def test_apply_schema_empty_list_valid() -> None:
+    """Empty lists should be considered valid."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "Tags"),
+                source="tags",
+                expected_type=list,
+                item_expected_type=str,
+            ),
+        ],
+    )
+    extra = {"tags": []}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "Tags": [],
+        },
+    }
+    assert problems == []
+
+
+def test_apply_schema_list_with_primitives() -> None:
+    """Lists with primitive values should be valid."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "Tags"),
+                source="tags",
+                expected_type=list,
+                item_expected_type=str,
+            ),
+        ],
+    )
+    extra = {"tags": ["tag1", "tag2", "tag3"]}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "Tags": ["tag1", "tag2", "tag3"],
+        },
+    }
+    assert problems == []
+
+
+def test_apply_schema_list_with_mixed_primitives() -> None:
+    """Lists with mixed primitive types should be invalid."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "Values"),
+                source="values",
+                expected_type=list,
+                item_expected_type=int,
+            ),
+        ],
+    )
+    extra = {"values": [1, "two", 3.0, True]}
+    result, problems = apply_schema_internal(schema, extra)
+    # Whole list should be rejected because not all elements are of type int.
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected all elements to be of type int" in problems[0].message
+
+
+def test_apply_schema_list_with_non_primitives_invalid() -> None:
+    """Lists with non-primitive elements should produce problems."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "Items"),
+                source="items",
+                expected_type=list,
+                item_expected_type=int,
+            ),
+        ],
+    )
+    extra = {"items": [1, {"nested": "dict"}, 3]}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "is a list but contains elements" in problems[0].message
+
+
+def test_apply_schema_list_with_nested_list_invalid() -> None:
+    """Nested lists should produce problems."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "Items"),
+                source="items",
+                expected_type=list,
+                item_expected_type=int,
+            ),
+        ],
+    )
+    extra = {"items": [1, [2, 3], 4]}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "is a list but contains elements" in problems[0].message
+
+
+def test_apply_schema_type_mismatch_produces_problem() -> None:
+    """Type mismatches should produce problems."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "UserID"), source="user_id", expected_type=int
+            ),
+        ],
+    )
+    extra = {"user_id": "not-an-int"}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+
+
+def test_apply_schema_none_value_produces_problem() -> None:
+    """None values should produce problems."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "UserID"), source="user_id", expected_type=int
+            ),
+        ],
+    )
+    extra = {"user_id": None}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "None" in problems[0].message
+    assert "not allowed" in problems[0].message
+
+
+def test_apply_schema_none_value_with_multiple_leaves_produces_single_problem() -> None:
+    """None values with multiple leaves referencing same source produce one problem."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "Metadata", "ID"),
+                source="request_id",
+                expected_type=str,
+            ),
+        ],
+    )
+    extra = {"request_id": None}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1  # Should be 1, not 2
+    assert "None" in problems[0].message
+    assert "not allowed" in problems[0].message
+    assert "request_id" in problems[0].message
+
+
+def test_apply_schema_partial_validation() -> None:
+    """Some fields valid, others invalid should log valid ones and report problems."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "UserID"), source="user_id", expected_type=int
+            ),
+        ],
+    )
+    extra = {
+        "request_id": "abc-123",  # valid
+        "user_id": "not-an-int",  # invalid
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    # Valid field should be in result
+    assert result == {
+        "ServicePayload": {
+            "RequestID": "abc-123",
+        },
+    }
+    # Invalid field should produce problem
+    assert len(problems) == 1
+    assert "user_id" in problems[0].message
+
+
+def test_apply_schema_redundant_fields_with_non_empty_schema() -> None:
+    """Redundant fields should produce problems when schema is not empty."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+        ],
+    )
+    extra = {
+        "request_id": "abc-123",
+        "unknown_field": "value",
+        "another_unknown": 42,
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "RequestID": "abc-123",
+        },
+    }
+    assert len(problems) == 2
+    problem_messages = [p.message for p in problems]
+    assert any("unknown_field" in msg for msg in problem_messages)
+    assert any("another_unknown" in msg for msg in problem_messages)
+
+
+def test_apply_schema_redundant_fields_with_empty_schema() -> None:
+    """Redundant fields should produce problems when schema is empty."""
+    schema = CompiledSchema(leaves=[])
+    extra = {
+        "unknown_field": "value",
+        "another_unknown": 42,
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    # Both fields should be reported as redundant.
+    problem_messages = [p.message for p in problems]
+    assert (
+        "Field 'unknown_field' is not defined in schema and will be ignored"
+        in problem_messages
+    )
+    assert (
+        "Field 'another_unknown' is not defined in schema and will be ignored"
+        in problem_messages
+    )
+
+
+def test_apply_schema_strips_empty_dicts() -> None:
+    """apply_schema_internal should strip empty dictionaries from result."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "Metadata", "ID"),
+                source="request_id",
+                expected_type=str,
+            ),
+        ],
+    )
+    # Only provide one field, which will create nested structure
+    extra = {"request_id": "abc-123"}
+    result, problems = apply_schema_internal(schema, extra)
+    # Should not have empty dicts
+    assert "ServicePayload" in result
+    assert "Metadata" in result["ServicePayload"]
+    # Verify structure is correct
+    assert result["ServicePayload"]["RequestID"] == "abc-123"
+    assert result["ServicePayload"]["Metadata"]["ID"] == "abc-123"
+
+
+def test_apply_schema_deeply_nested_structure() -> None:
+    """apply_schema_internal should handle deeply nested structures."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("Level1", "Level2", "Level3", "Level4", "Value"),
+                source="value",
+                expected_type=str,
+            ),
+        ],
+    )
+    extra = {"value": "deep-value"}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "Level1": {
+            "Level2": {
+                "Level3": {
+                    "Level4": {
+                        "Value": "deep-value",
+                    },
+                },
+            },
+        },
+    }
+    assert problems == []
+
+
+def test_apply_schema_missing_fields_no_problems() -> None:
+    """Missing fields in extra should not produce problems, just be omitted."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "RequestID"),
+                source="request_id",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "UserID"), source="user_id", expected_type=int
+            ),
+        ],
+    )
+    extra = {}  # No fields provided
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert problems == []
+
+
+def test_apply_schema_multiple_sources_different_branches() -> None:
+    """Multiple sources in different branches should work independently."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(path=("Branch1", "Value"), source="value1", expected_type=str),
+            SchemaLeaf(path=("Branch2", "Value"), source="value2", expected_type=int),
+        ],
+    )
+    extra = {
+        "value1": "string-value",
+        "value2": 42,
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "Branch1": {"Value": "string-value"},
+        "Branch2": {"Value": 42},
+    }
+    assert problems == []
+
+
+def test_apply_schema_bool_not_accepted_for_int() -> None:
+    """Bool values should not pass validation for int types."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "UserID"), source="user_id", expected_type=int
+            ),
+        ],
+    )
+    # True should not pass for int
+    extra = {"user_id": True}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+    assert "bool" in problems[0].message.lower()
+
+    # False should not pass for int
+    extra = {"user_id": False}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+    assert "bool" in problems[0].message.lower()
+
+
+def test_apply_schema_int_not_accepted_for_bool() -> None:
+    """Int values should not pass validation for bool types."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "IsActive"),
+                source="is_active",
+                expected_type=bool,
+            ),
+        ],
+    )
+    # 1 should not pass for bool
+    extra = {"is_active": 1}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected bool" in problems[0].message
+    assert "int" in problems[0].message.lower()
+
+    # 0 should not pass for bool
+    extra = {"is_active": 0}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected bool" in problems[0].message
+    assert "int" in problems[0].message.lower()
+
+
+def test_apply_schema_strict_type_checking_for_all_primitives() -> None:
+    """Strict type checking should work for all primitive types."""
+    schema = CompiledSchema(
+        leaves=[
+            SchemaLeaf(
+                path=("ServicePayload", "StringField"),
+                source="string_field",
+                expected_type=str,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "IntField"),
+                source="int_field",
+                expected_type=int,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "FloatField"),
+                source="float_field",
+                expected_type=float,
+            ),
+            SchemaLeaf(
+                path=("ServicePayload", "BoolField"),
+                source="bool_field",
+                expected_type=bool,
+            ),
+        ],
+    )
+
+    # Valid values should pass
+    extra = {
+        "string_field": "text",
+        "int_field": 42,
+        "float_field": 3.14,
+        "bool_field": True,
+    }
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {
+        "ServicePayload": {
+            "StringField": "text",
+            "IntField": 42,
+            "FloatField": 3.14,
+            "BoolField": True,
+        },
+    }
+    assert problems == []
+
+    # String should not pass for int
+    extra = {"int_field": "42"}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+
+    # Int should not pass for float
+    extra = {"float_field": 42}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected float" in problems[0].message
+
+    # Float should not pass for int
+    extra = {"int_field": 3.14}
+    result, problems = apply_schema_internal(schema, extra)
+    assert result == {}
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
