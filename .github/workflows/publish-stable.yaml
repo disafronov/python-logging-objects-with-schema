@@ -24,6 +24,23 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Verify version matches tag
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          # Remove 'v' prefix from tag (v1.2.3 -> 1.2.3)
+          EXPECTED_VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          # Extract version from pyproject.toml using tomli (compatible with Python 3.7+)
+          uv pip install tomli
+          ACTUAL_VERSION=$(python3 -c "import tomli; f=open('pyproject.toml','rb'); data=tomli.load(f); print(data['project']['version'])")
+          if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+            echo "Error: Version mismatch!"
+            echo "Tag: $TAG_NAME"
+            echo "Expected version in pyproject.toml: $EXPECTED_VERSION"
+            echo "Actual version in pyproject.toml: $ACTUAL_VERSION"
+            exit 1
+          fi
+          echo "Version verification passed: $ACTUAL_VERSION"
+
       - name: Build package
         run: uv build
 
