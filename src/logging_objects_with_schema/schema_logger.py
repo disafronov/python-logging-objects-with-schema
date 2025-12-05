@@ -55,9 +55,11 @@ class SchemaLogger(logging.Logger):
             # Catch specific exceptions that can occur during schema compilation:
             # - OSError: file system issues (e.g., os.getcwd() failures,
             #   permission errors)
-            # - ValueError: data validation issues (e.g., JSON parsing,
-            #   schema structure)
+            # - ValueError: path resolution issues (e.g., invalid path characters,
+            #   malformed paths during schema file discovery)
             # - RuntimeError: threading issues (e.g., lock acquisition problems)
+            # Note: JSON parsing and schema structure validation errors are
+            # converted to SchemaProblem instances and do not raise ValueError here.
             # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
             # caught, which is the correct behavior.
             # Ensure that a partially initialised logger instance is not left
