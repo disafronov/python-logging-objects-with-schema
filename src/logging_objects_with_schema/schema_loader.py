@@ -224,6 +224,18 @@ def _format_path(path: tuple[str, ...], key: str | None = None) -> str:
     return ".".join(path)
 
 
+def _is_empty_or_none(value: Any) -> bool:
+    """Check if a value is None or an empty string.
+
+    Args:
+        value: The value to check.
+
+    Returns:
+        True if value is None or an empty/whitespace-only string, False otherwise.
+    """
+    return value is None or (isinstance(value, str) and value.strip() == "")
+
+
 def _compile_schema_tree(
     node: MutableMapping[str, Any],
     path: Tuple[str, ...],
@@ -264,12 +276,8 @@ def _compile_schema_tree(
 
         if leaf_type is not None or leaf_source is not None:
             # This is supposed to be a leaf - validate required fields first.
-            type_invalid = leaf_type is None or (
-                isinstance(leaf_type, str) and leaf_type.strip() == ""
-            )
-            source_invalid = leaf_source is None or (
-                isinstance(leaf_source, str) and leaf_source.strip() == ""
-            )
+            type_invalid = _is_empty_or_none(leaf_type)
+            source_invalid = _is_empty_or_none(leaf_source)
 
             if type_invalid:
                 problems.append(
@@ -304,9 +312,7 @@ def _compile_schema_tree(
             # to ensure element homogeneity (e.g. list[str], list[int]).
             if expected_type is list:
                 item_type_name = value_dict.get("item_type")
-                item_type_invalid = item_type_name is None or (
-                    isinstance(item_type_name, str) and item_type_name.strip() == ""
-                )
+                item_type_invalid = _is_empty_or_none(item_type_name)
                 if item_type_invalid:
                     problems.append(
                         SchemaProblem(
