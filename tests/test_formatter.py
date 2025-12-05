@@ -6,10 +6,20 @@ functionality directly, without going through SchemaLogger.
 
 from __future__ import annotations
 
+from logging_objects_with_schema.errors import DataProblem
 from logging_objects_with_schema.schema_applier import (
     _apply_schema_internal as apply_schema_internal,
 )
+from logging_objects_with_schema.schema_applier import (
+    _set_nested_value as set_nested_value,
+)
 from logging_objects_with_schema.schema_applier import _strip_empty as strip_empty
+from logging_objects_with_schema.schema_applier import (
+    _validate_and_apply_leaf as validate_and_apply_leaf,
+)
+from logging_objects_with_schema.schema_applier import (
+    _validate_list_value as validate_list_value,
+)
 from logging_objects_with_schema.schema_loader import CompiledSchema, SchemaLeaf
 
 
@@ -623,3 +633,196 @@ def test_apply_schema_strict_type_checking_for_all_primitives() -> None:
     assert result == {}
     assert len(problems) == 1
     assert "expected int" in problems[0].message
+
+
+# Tests for helper functions
+
+
+def test_validate_list_value_empty_list_returns_none() -> None:
+    """validate_list_value should return None for empty lists."""
+    result = validate_list_value([], "test_field", str)
+    assert result is None
+
+
+def test_validate_list_value_valid_items_returns_none() -> None:
+    """validate_list_value should return None for lists with valid items."""
+    result = validate_list_value(["a", "b", "c"], "test_field", str)
+    assert result is None
+
+    result = validate_list_value([1, 2, 3], "test_field", int)
+    assert result is None
+
+    result = validate_list_value([1.0, 2.5, 3.14], "test_field", float)
+    assert result is None
+
+    result = validate_list_value([True, False], "test_field", bool)
+    assert result is None
+
+
+def test_validate_list_value_mixed_types_returns_problem() -> None:
+    """validate_list_value should return DataProblem for mixed types."""
+    result = validate_list_value([1, "two", 3], "test_field", int)
+    assert isinstance(result, DataProblem)
+    assert "test_field" in result.message
+    assert "str" in result.message
+    assert "expected all elements to be of type int" in result.message
+
+
+def test_validate_list_value_none_item_type_returns_problem() -> None:
+    """validate_list_value should return DataProblem when item_expected_type is None."""
+    result = validate_list_value([1, 2, 3], "test_field", None)
+    assert isinstance(result, DataProblem)
+    assert "test_field" in result.message
+    assert "no item type configured" in result.message
+
+
+def test_validate_list_value_nested_list_returns_problem() -> None:
+    """validate_list_value should return DataProblem for nested lists."""
+    result = validate_list_value([1, [2, 3], 4], "test_field", int)
+    assert isinstance(result, DataProblem)
+    assert "list" in result.message.lower()
+
+
+def test_validate_list_value_dict_in_list_returns_problem() -> None:
+    """validate_list_value should return DataProblem for dicts in list."""
+    result = validate_list_value([1, {"key": "value"}, 3], "test_field", int)
+    assert isinstance(result, DataProblem)
+    assert "dict" in result.message.lower()
+
+
+def test_set_nested_value_single_level() -> None:
+    """set_nested_value should set value at single level."""
+    target = {}
+    set_nested_value(target, ("key",), "value")
+    assert target == {"key": "value"}
+
+
+def test_set_nested_value_two_levels() -> None:
+    """set_nested_value should create nested structure for two levels."""
+    target = {}
+    set_nested_value(target, ("level1", "level2"), "value")
+    assert target == {"level1": {"level2": "value"}}
+
+
+def test_set_nested_value_deeply_nested() -> None:
+    """set_nested_value should create deeply nested structure."""
+    target = {}
+    set_nested_value(target, ("a", "b", "c", "d", "e"), "value")
+    assert target == {"a": {"b": {"c": {"d": {"e": "value"}}}}}
+
+
+def test_set_nested_value_preserves_existing_structure() -> None:
+    """set_nested_value should preserve existing dictionary structure."""
+    target = {"existing": {"key": "value"}}
+    set_nested_value(target, ("existing", "new_key"), "new_value")
+    assert target == {"existing": {"key": "value", "new_key": "new_value"}}
+
+
+def test_set_nested_value_overwrites_existing_value() -> None:
+    """set_nested_value should overwrite existing value at path."""
+    target = {"level1": {"level2": "old_value"}}
+    set_nested_value(target, ("level1", "level2"), "new_value")
+    assert target == {"level1": {"level2": "new_value"}}
+
+
+def test_validate_and_apply_leaf_valid_value() -> None:
+    """validate_and_apply_leaf should apply valid value to target."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "RequestID"),
+        source="request_id",
+        expected_type=str,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, "abc-123", "request_id", extra, problems)
+
+    assert problems == []
+    assert extra == {"ServicePayload": {"RequestID": "abc-123"}}
+
+
+def test_validate_and_apply_leaf_type_mismatch() -> None:
+    """validate_and_apply_leaf should add problem for type mismatch."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "UserID"),
+        source="user_id",
+        expected_type=int,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, "not-an-int", "user_id", extra, problems)
+
+    assert len(problems) == 1
+    assert "expected int" in problems[0].message
+    assert extra == {}
+
+
+def test_validate_and_apply_leaf_valid_list() -> None:
+    """validate_and_apply_leaf should apply valid list value."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "Tags"),
+        source="tags",
+        expected_type=list,
+        item_expected_type=str,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, ["tag1", "tag2"], "tags", extra, problems)
+
+    assert problems == []
+    assert extra == {"ServicePayload": {"Tags": ["tag1", "tag2"]}}
+
+
+def test_validate_and_apply_leaf_invalid_list() -> None:
+    """validate_and_apply_leaf should add problem for invalid list."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "Values"),
+        source="values",
+        expected_type=list,
+        item_expected_type=int,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, [1, "two", 3], "values", extra, problems)
+
+    assert len(problems) == 1
+    assert "is a list but contains elements" in problems[0].message
+    assert extra == {}
+
+
+def test_validate_and_apply_leaf_empty_list() -> None:
+    """validate_and_apply_leaf should accept empty lists."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "Tags"),
+        source="tags",
+        expected_type=list,
+        item_expected_type=str,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, [], "tags", extra, problems)
+
+    assert problems == []
+    assert extra == {"ServicePayload": {"Tags": []}}
+
+
+def test_validate_and_apply_leaf_list_without_item_type() -> None:
+    """validate_and_apply_leaf should add problem when item_expected_type is None."""
+    leaf = SchemaLeaf(
+        path=("ServicePayload", "Items"),
+        source="items",
+        expected_type=list,
+        item_expected_type=None,
+    )
+    extra = {}
+    problems = []
+
+    validate_and_apply_leaf(leaf, [1, 2, 3], "items", extra, problems)
+
+    assert len(problems) == 1
+    assert "no item type configured" in problems[0].message
+    assert extra == {}
