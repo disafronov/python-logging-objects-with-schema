@@ -568,7 +568,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     Returns:
         Tuple of (CompiledSchema, list[SchemaProblem]).
     """
-    schema_path = _get_schema_path().resolve()
+    schema_path = _get_schema_path()
 
     # Fast-path: if we have already attempted to compile schema for this path,
     # return cached result (successful, missing-file, or invalid-schema).
