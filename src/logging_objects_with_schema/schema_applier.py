@@ -234,13 +234,19 @@ def _apply_schema_internal(
             _validate_and_apply_leaf(leaf, value, source, extra, problems)
 
     # Report redundant fields for any keys not referenced by schema leaves.
-    for key in extra_values.keys():
-        if key not in used_sources:
-            problems.append(
-                DataProblem(
-                    f"Field '{key}' is not defined in schema and will be ignored",
-                ),
-            )
+    # Optimization: if schema is empty (no used_sources), all fields are redundant,
+    # so we can skip the membership check for each key.
+    redundant_keys = (
+        extra_values.keys()
+        if not used_sources
+        else (key for key in extra_values.keys() if key not in used_sources)
+    )
+    for key in redundant_keys:
+        problems.append(
+            DataProblem(
+                f"Field '{key}' is not defined in schema and will be ignored",
+            ),
+        )
 
     cleaned_extra = _strip_empty(extra)
     return cleaned_extra, problems
