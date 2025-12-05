@@ -144,9 +144,9 @@ except SchemaValidationError as e:
         print(f"  - {problem.message}")
     # Decide whether to abort or continue with default logger
     raise
-except (OSError, RuntimeError) as e:
-    # System-level errors (e.g., inaccessible working directory, lock failures)
-    # are raised directly, not wrapped in SchemaValidationError
+except (OSError, ValueError, RuntimeError) as e:
+    # System-level errors (e.g., inaccessible working directory, lock failures,
+    # path resolution issues) are raised directly, not wrapped in SchemaValidationError
     print(f"System error during logger initialization: {e}")
     raise
 
@@ -330,11 +330,12 @@ should abort startup, or whether it should be logged and ignored.
 
 **Note**: In rare cases, system-level errors may be raised directly instead of
 being wrapped in `SchemaValidationError`. Specifically, `OSError` (e.g., when
-the current working directory is inaccessible or deleted) and `RuntimeError`
-(e.g., when thread lock acquisition fails) are propagated as-is to indicate
-environmental issues rather than schema validation problems. Applications
-should handle these exceptions separately if they need to distinguish between
-schema validation failures and system-level errors.
+the current working directory is inaccessible or deleted), `ValueError` (e.g.,
+when path resolution fails due to invalid characters or malformed paths), and
+`RuntimeError` (e.g., when thread lock acquisition fails) are propagated as-is
+to indicate environmental issues rather than schema validation problems.
+Applications should handle these exceptions separately if they need to
+distinguish between schema validation failures and system-level errors.
 
 ## Schema caching and thread safety
 
