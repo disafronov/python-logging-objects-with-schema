@@ -200,3 +200,143 @@ def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
         assert "bad-schema-logger" not in logging.Logger.manager.loggerDict
     finally:
         logging.setLoggerClass(logging.Logger)
+
+
+def test_schema_logger_handles_oserror_from_getcwd_and_cleans_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SchemaLogger should catch OSError from os.getcwd() and clean up logger.
+
+    If os.getcwd() raises OSError (e.g., when CWD is deleted), the exception
+    should be caught, logger should be cleaned up from cache, and exception
+    should be re-raised.
+    """
+    import os
+
+    import logging_objects_with_schema.schema_loader as schema_loader
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(tmp_path, {"ServicePayload": {}})
+
+    original_getcwd = os.getcwd
+
+    def fake_getcwd() -> str:
+        raise OSError("Current working directory no longer exists")
+
+    monkeypatch.setattr(os, "getcwd", fake_getcwd)
+
+    logging.setLoggerClass(SchemaLogger)
+    try:
+        # Clear schema cache to force recompilation
+        with schema_loader._cache_lock:
+            schema_loader._SCHEMA_CACHE.clear()
+        with schema_loader._path_cache_lock:
+            schema_loader._resolved_schema_path = None
+            schema_loader._cached_cwd = None
+
+        # Attempting to create/get the logger should raise OSError,
+        # and the partially initialised instance must be removed from cache.
+        with pytest.raises(OSError, match="Current working directory"):
+            logging.getLogger("oserror-logger")
+
+        # Ensure that the logger with this name is not left registered in the
+        # logging manager cache after failed initialisation.
+        assert "oserror-logger" not in logging.Logger.manager.loggerDict
+    finally:
+        monkeypatch.setattr(os, "getcwd", original_getcwd)
+        logging.setLoggerClass(logging.Logger)
+
+
+def test_schema_logger_handles_runtimeerror_from_lock_and_cleans_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SchemaLogger should catch RuntimeError from threading locks and clean up.
+
+    If a threading lock raises RuntimeError (e.g., deadlock detection),
+    the exception should be caught, logger should be cleaned up from cache,
+    and exception should be re-raised.
+    """
+    import logging_objects_with_schema.schema_loader as schema_loader
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(tmp_path, {"ServicePayload": {}})
+
+    original_lock = schema_loader._cache_lock
+
+    class FakeLock:
+        def __enter__(self) -> None:
+            raise RuntimeError("Lock acquisition failed")
+
+        def __exit__(self, *args: object) -> None:
+            pass
+
+    fake_lock = FakeLock()
+    monkeypatch.setattr(schema_loader, "_cache_lock", fake_lock)
+
+    logging.setLoggerClass(SchemaLogger)
+    try:
+        # Clear schema cache to force recompilation
+        with original_lock:
+            schema_loader._SCHEMA_CACHE.clear()
+        with schema_loader._path_cache_lock:
+            schema_loader._resolved_schema_path = None
+            schema_loader._cached_cwd = None
+
+        # Attempting to create/get the logger should raise RuntimeError,
+        # and the partially initialised instance must be removed from cache.
+        with pytest.raises(RuntimeError, match="Lock acquisition failed"):
+            logging.getLogger("runtimeerror-logger")
+
+        # Ensure that the logger with this name is not left registered in the
+        # logging manager cache after failed initialisation.
+        assert "runtimeerror-logger" not in logging.Logger.manager.loggerDict
+    finally:
+        monkeypatch.setattr(schema_loader, "_cache_lock", original_lock)
+        logging.setLoggerClass(logging.Logger)
+
+
+def test_schema_logger_handles_valueerror_and_cleans_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SchemaLogger should catch ValueError and clean up logger.
+
+    If ValueError is raised during schema compilation (outside of the
+    try-except block in _compile_schema_internal), the exception should be
+    caught, logger should be cleaned up from cache, and exception should be
+    re-raised.
+    """
+    import logging_objects_with_schema.schema_loader as schema_loader
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(tmp_path, {"ServicePayload": {}})
+
+    original_get_schema_path = schema_loader._get_schema_path
+
+    def fake_get_schema_path() -> Path:
+        raise ValueError("Unexpected value error during path resolution")
+
+    monkeypatch.setattr(schema_loader, "_get_schema_path", fake_get_schema_path)
+
+    logging.setLoggerClass(SchemaLogger)
+    try:
+        # Clear schema cache to force recompilation
+        with schema_loader._cache_lock:
+            schema_loader._SCHEMA_CACHE.clear()
+        with schema_loader._path_cache_lock:
+            schema_loader._resolved_schema_path = None
+            schema_loader._cached_cwd = None
+
+        # Attempting to create/get the logger should raise ValueError,
+        # and the partially initialised instance must be removed from cache.
+        with pytest.raises(ValueError, match="Unexpected value error"):
+            logging.getLogger("valueerror-logger")
+
+        # Ensure that the logger with this name is not left registered in the
+        # logging manager cache after failed initialisation.
+        assert "valueerror-logger" not in logging.Logger.manager.loggerDict
+    finally:
+        monkeypatch.setattr(schema_loader, "_get_schema_path", original_get_schema_path)
+        logging.setLoggerClass(logging.Logger)
