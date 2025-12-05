@@ -6,7 +6,6 @@ name: Publish to PyPI (stable)
     tags:
       # Publish final release tags (without -rc suffix).
       - "v[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
 
 jobs:
   publish:
