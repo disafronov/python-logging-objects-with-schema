@@ -6,7 +6,6 @@ name: Publish Release Candidate to Test PyPI
     tags:
       # Publish release candidate tags.
       - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
-  workflow_dispatch:
 
 jobs:
   publish-rc:
