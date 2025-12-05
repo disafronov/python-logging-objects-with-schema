@@ -23,6 +23,9 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Create virtual environment
+        run: uv venv
+
       - name: Verify version matches tag
         run: |
           TAG_NAME="${GITHUB_REF#refs/tags/}"
