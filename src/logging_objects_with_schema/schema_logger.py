@@ -56,16 +56,24 @@ class SchemaLogger(logging.Logger):
             # registered in the logging manager if schema compilation fails.
             # Otherwise, subsequent logging.getLogger(name) calls could return
             # this broken instance and lead to AttributeError at runtime.
-            self.manager.loggerDict.pop(self.name, None)
+            self._cleanup_failed_logger()
             raise
 
         if problems:
             # Schema is invalid; remove this instance from the logging manager
             # cache before raising, for the same reason as above.
-            self.manager.loggerDict.pop(self.name, None)
+            self._cleanup_failed_logger()
             raise SchemaValidationError("Schema has problems", problems=problems)
 
         self._schema: CompiledSchema = compiled
+
+    def _cleanup_failed_logger(self) -> None:
+        """Remove this logger instance from the logging manager.
+
+        Called when schema compilation fails to prevent broken logger
+        instances from being cached and reused.
+        """
+        self.manager.loggerDict.pop(self.name, None)
 
     def _log(
         self,
