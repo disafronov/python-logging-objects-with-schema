@@ -117,6 +117,8 @@ def _validate_and_apply_leaf(
 
     # For lists, validate that all elements strictly match the declared
     # item_expected_type (homogeneous primitive list).
+    # Note: isinstance() check is needed for type narrowing (mypy), even though
+    # type(value) is list is already guaranteed by the check above.
     if leaf.expected_type is list and isinstance(value, list):
         list_problem = _validate_list_value(value, source, leaf.item_expected_type)
         if list_problem is not None:
