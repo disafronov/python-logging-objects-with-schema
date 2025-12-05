@@ -33,7 +33,7 @@ jobs:
           EXPECTED_VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
           # Extract version from pyproject.toml using tomli (compatible with Python 3.7+)
           uv pip install tomli
-          ACTUAL_VERSION=$(python3 -c "import tomli; f=open('pyproject.toml','rb'); data=tomli.load(f); print(data['project']['version'])")
+          ACTUAL_VERSION=$(uv run python -c "import tomli; f=open('pyproject.toml','rb'); data=tomli.load(f); print(data['project']['version'])")
           if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
             echo "Error: Version mismatch!"
             echo "Tag: $TAG_NAME"
