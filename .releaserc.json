@@ -25,10 +25,10 @@
         }],
         ["@semantic-release/release-notes-generator", { "preset": "conventionalcommits" }],
         ["@semantic-release/exec", {
-            "prepareCmd": "node -e \"const fs=require('fs'),toml=require('@iarna/toml');const f='pyproject.toml';const data=toml.parse(fs.readFileSync(f,'utf8'));let version='${nextRelease.version}';version=version.replace(/-rc\\./g,'rc');data.project.version=version;fs.writeFileSync(f,toml.stringify(data))\""
+            "prepareCmd": "node -e \"const fs=require('fs'),toml=require('@iarna/toml');let version='${nextRelease.version}';version=version.replace(/-rc\\\\./g,'rc');const pyprojectFile='pyproject.toml';const pyprojectData=toml.parse(fs.readFileSync(pyprojectFile,'utf8'));const packageName=pyprojectData.project.name;pyprojectData.project.version=version;fs.writeFileSync(pyprojectFile,toml.stringify(pyprojectData));const uvLockFile='uv.lock';const uvLockData=toml.parse(fs.readFileSync(uvLockFile,'utf8'));const packageIndex=uvLockData.package.findIndex(p=>p.name===packageName);if(packageIndex!==-1){uvLockData.package[packageIndex].version=version;fs.writeFileSync(uvLockFile,toml.stringify(uvLockData));}\""
         }],
         ["@semantic-release/git", {
-            "assets": ["pyproject.toml"],
+            "assets": ["pyproject.toml", "uv.lock"],
             "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
         }],
         ["@semantic-release/github", {}]
