@@ -207,12 +207,12 @@ def _apply_schema_internal(
     extra: dict[str, Any] = {}
     problems: list[DataProblem] = []
 
-    used_sources = {leaf.source for leaf in compiled.leaves}
-
     # Group leaves by source for efficient processing
     source_to_leaves: dict[str, list[SchemaLeaf]] = defaultdict(list)
     for leaf in compiled.leaves:
         source_to_leaves[leaf.source].append(leaf)
+
+    used_sources = set(source_to_leaves.keys())
 
     for source, leaves in source_to_leaves.items():
         if source not in extra_values:
