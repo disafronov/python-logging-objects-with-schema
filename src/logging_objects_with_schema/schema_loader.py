@@ -105,7 +105,7 @@ def _find_schema_file() -> Path | None:
     Returns:
         Absolute path to schema file if found, None otherwise.
     """
-    start_path = Path(os.getcwd()).resolve()
+    start_path = _get_current_working_directory()
     current = start_path
 
     while True:
@@ -121,6 +121,15 @@ def _find_schema_file() -> Path | None:
         current = parent
 
     return None
+
+
+def _get_current_working_directory() -> Path:
+    """Get the current working directory as a resolved Path.
+
+    Returns:
+        Absolute path to the current working directory.
+    """
+    return Path(os.getcwd()).resolve()
 
 
 def _check_cached_found_file_path() -> Path | None:
@@ -163,7 +172,7 @@ def _check_cached_missing_file_path() -> Path | None:
 
     # Cached path is based on CWD when file was not found,
     # check if CWD changed
-    current_cwd = Path(os.getcwd()).resolve()
+    current_cwd = _get_current_working_directory()
     if current_cwd != _cached_cwd:
         # CWD changed, invalidate cache and re-search from new CWD
         _resolved_schema_path = None
@@ -198,7 +207,7 @@ def _cache_and_return_missing_path() -> Path:
     """
     global _resolved_schema_path, _cached_cwd
 
-    current_cwd = Path(os.getcwd()).resolve()
+    current_cwd = _get_current_working_directory()
     schema_path = (current_cwd / SCHEMA_FILE_NAME).resolve()
     _resolved_schema_path = schema_path
     _cached_cwd = current_cwd  # Track CWD since path depends on it
