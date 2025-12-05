@@ -323,6 +323,14 @@ consistent type expectations when reusing a `source` field.
 The application decides whether `SchemaValidationError` is a fatal error that
 should abort startup, or whether it should be logged and ignored.
 
+**Note**: In rare cases, system-level errors may be raised directly instead of
+being wrapped in `SchemaValidationError`. Specifically, `OSError` (e.g., when
+the current working directory is inaccessible or deleted) and `RuntimeError`
+(e.g., when thread lock acquisition fails) are propagated as-is to indicate
+environmental issues rather than schema validation problems. Applications
+should handle these exceptions separately if they need to distinguish between
+schema validation failures and system-level errors.
+
 ## Schema caching and thread safety
 
 - The library caches compiled schemas to avoid recompiling the same schema file
