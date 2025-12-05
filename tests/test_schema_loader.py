@@ -7,6 +7,7 @@ expected contract rather than exhaustively cover edge cases.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -31,9 +32,21 @@ from logging_objects_with_schema.schema_loader import (
     _check_cached_missing_file_path as check_cached_missing_file_path,
 )
 from logging_objects_with_schema.schema_loader import (
+    _check_root_conflicts as check_root_conflicts,
+)
+from logging_objects_with_schema.schema_loader import (
     _compile_schema_internal as compile_schema_internal,
 )
+from logging_objects_with_schema.schema_loader import (
+    _compile_schema_tree as compile_schema_tree,
+)
+from logging_objects_with_schema.schema_loader import (
+    _create_empty_compiled_schema_with_problems as create_empty_schema,
+)
 from logging_objects_with_schema.schema_loader import _format_path as format_path
+from logging_objects_with_schema.schema_loader import (
+    _get_current_working_directory as get_current_working_directory,
+)
 from logging_objects_with_schema.schema_loader import (
     _get_schema_path as get_schema_path,
 )
@@ -41,7 +54,13 @@ from logging_objects_with_schema.schema_loader import (
     _is_empty_or_none as is_empty_or_none,
 )
 from logging_objects_with_schema.schema_loader import (
+    _load_raw_schema as load_raw_schema,
+)
+from logging_objects_with_schema.schema_loader import (
     _validate_and_create_leaf as validate_and_create_leaf,
+)
+from logging_objects_with_schema.schema_loader import (
+    get_builtin_logrecord_attributes,
 )
 from tests.conftest import _write_schema
 
@@ -1102,3 +1121,316 @@ def test_cache_and_return_missing_path_caches_path(
         assert result == expected_path
         assert schema_loader._resolved_schema_path == expected_path
         assert schema_loader._cached_cwd == tmp_path.resolve()
+
+
+def test_get_current_working_directory_returns_resolved_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_current_working_directory should return resolved absolute path to CWD."""
+    monkeypatch.chdir(tmp_path)
+
+    result = get_current_working_directory()
+
+    assert isinstance(result, Path)
+    assert result.is_absolute()
+    assert result == tmp_path.resolve()
+
+
+def test_get_current_working_directory_changes_with_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_current_working_directory should return different paths for different CWDs."""  # noqa: E501
+    dir1 = tmp_path / "dir1"
+    dir2 = tmp_path / "dir2"
+    dir1.mkdir()
+    dir2.mkdir()
+
+    monkeypatch.chdir(dir1)
+    path1 = get_current_working_directory()
+
+    monkeypatch.chdir(dir2)
+    path2 = get_current_working_directory()
+
+    assert path1 != path2
+    assert path1 == dir1.resolve()
+    assert path2 == dir2.resolve()
+
+
+def test_create_empty_compiled_schema_with_problems() -> None:
+    """_create_empty_compiled_schema_with_problems creates empty schema with problems."""  # noqa: E501
+    problems = [
+        SchemaProblem("Problem 1"),
+        SchemaProblem("Problem 2"),
+    ]
+
+    compiled, result_problems = create_empty_schema(problems)
+
+    assert isinstance(compiled, CompiledSchema)
+    assert compiled.is_empty
+    assert compiled.leaves == []
+    assert result_problems == problems
+    assert len(result_problems) == 2
+
+
+def test_create_empty_compiled_schema_with_empty_problems() -> None:
+    """_create_empty_compiled_schema_with_problems works with empty problems list."""  # noqa: E501
+    problems: list[SchemaProblem] = []
+
+    compiled, result_problems = create_empty_schema(problems)
+
+    assert isinstance(compiled, CompiledSchema)
+    assert compiled.is_empty
+    assert result_problems == []
+
+
+def test_load_raw_schema_loads_valid_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_load_raw_schema should load and parse valid JSON schema."""
+    monkeypatch.chdir(tmp_path)
+    schema_data = {
+        "ServicePayload": {
+            "RequestID": {"type": "str", "source": "request_id"},
+        },
+    }
+    _write_schema(tmp_path, schema_data)
+
+    data, schema_path = load_raw_schema()
+
+    assert isinstance(data, dict)
+    assert data == schema_data
+    assert schema_path == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert schema_path.exists()
+
+
+def test_load_raw_schema_raises_file_not_found_when_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_load_raw_schema should raise FileNotFoundError when schema file is missing."""
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        load_raw_schema()
+
+    assert "Schema file not found" in str(exc_info.value)
+    assert SCHEMA_FILE_NAME in str(exc_info.value)
+
+
+def test_load_raw_schema_raises_value_error_for_invalid_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_load_raw_schema should raise ValueError for invalid JSON."""
+    monkeypatch.chdir(tmp_path)
+    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file.write_text("{ invalid json }", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_raw_schema()
+
+    assert "Failed to parse JSON schema" in str(exc_info.value)
+
+
+def test_load_raw_schema_raises_value_error_for_non_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_load_raw_schema should raise ValueError when top-level is not an object."""
+    monkeypatch.chdir(tmp_path)
+    schema_file = tmp_path / SCHEMA_FILE_NAME
+    # Write a JSON array instead of an object
+    schema_file.write_text('["not", "an", "object"]', encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_raw_schema()
+
+    assert "Top-level schema must be a JSON object" in str(exc_info.value)
+
+
+def test_compile_schema_tree_compiles_simple_tree() -> None:
+    """_compile_schema_tree should compile a simple schema tree into leaves."""
+    problems: list[SchemaProblem] = []
+    node = {
+        "ServicePayload": {
+            "RequestID": {"type": "str", "source": "request_id"},
+            "UserID": {"type": "int", "source": "user_id"},
+        },
+    }
+
+    leaves = list(compile_schema_tree(node, (), problems))
+
+    assert len(leaves) == 2
+    assert all(isinstance(leaf, SchemaLeaf) for leaf in leaves)
+    sources = {leaf.source for leaf in leaves}
+    assert sources == {"request_id", "user_id"}
+    assert problems == []
+
+
+def test_compile_schema_tree_handles_nested_structure() -> None:
+    """_compile_schema_tree should handle deeply nested structures."""
+    problems: list[SchemaProblem] = []
+    node = {
+        "Level1": {
+            "Level2": {
+                "Level3": {
+                    "Value": {"type": "str", "source": "value"},
+                },
+            },
+        },
+    }
+
+    leaves = list(compile_schema_tree(node, (), problems))
+
+    assert len(leaves) == 1
+    assert leaves[0].path == ("Level1", "Level2", "Level3", "Value")
+    assert leaves[0].source == "value"
+    assert problems == []
+
+
+def test_compile_schema_tree_reports_invalid_nodes() -> None:
+    """_compile_schema_tree should report problems for invalid nodes."""
+    problems: list[SchemaProblem] = []
+    node = {
+        "Valid": {
+            "Leaf": {"type": "str", "source": "valid"},
+        },
+        "Invalid": "not-an-object",
+    }
+
+    leaves = list(compile_schema_tree(node, (), problems))
+
+    assert len(leaves) == 1
+    assert leaves[0].source == "valid"
+    assert len(problems) == 1
+    assert "expected object" in problems[0].message.lower()
+
+
+def test_compile_schema_tree_respects_max_depth() -> None:
+    """_compile_schema_tree should stop processing when max depth is exceeded."""
+    problems: list[SchemaProblem] = []
+    # Create a path that exceeds MAX_SCHEMA_DEPTH
+    node = {}
+    current = node
+    for i in range(MAX_SCHEMA_DEPTH + 1):
+        current[f"Level{i}"] = {}
+        current = current[f"Level{i}"]
+
+    # Add a leaf at the deepest level
+    current["Value"] = {"type": "str", "source": "value"}
+
+    leaves = list(compile_schema_tree(node, (), problems))
+
+    # Should not process the leaf beyond max depth
+    assert len(leaves) == 0
+    assert any("exceeds maximum allowed depth" in p.message for p in problems)
+
+
+def test_get_builtin_logrecord_attributes_returns_set() -> None:
+    """get_builtin_logrecord_attributes should return a set of attribute names."""
+    attributes = get_builtin_logrecord_attributes()
+
+    assert isinstance(attributes, set)
+    assert len(attributes) > 0
+    assert all(isinstance(attr, str) for attr in attributes)
+
+
+def test_get_builtin_logrecord_attributes_includes_common_fields() -> None:
+    """get_builtin_logrecord_attributes should include common LogRecord fields."""
+    attributes = get_builtin_logrecord_attributes()
+
+    # These are standard LogRecord attributes
+    assert "name" in attributes
+    assert "levelno" in attributes
+    assert "pathname" in attributes
+    assert "lineno" in attributes
+    assert "msg" in attributes
+
+
+def test_get_builtin_logrecord_attributes_excludes_private_attributes() -> None:
+    """get_builtin_logrecord_attributes should not include private attributes."""
+    attributes = get_builtin_logrecord_attributes()
+
+    # Should not include private attributes (starting with _)
+    private_attrs = {attr for attr in attributes if attr.startswith("_")}
+    assert not private_attrs
+
+
+def test_get_builtin_logrecord_attributes_excludes_methods() -> None:
+    """get_builtin_logrecord_attributes should not include callable methods."""
+    attributes = get_builtin_logrecord_attributes()
+
+    # Should not include methods (callable attributes)
+    import logging
+
+    record = logging.LogRecord(
+        name="",
+        level=0,
+        pathname="",
+        lineno=0,
+        msg="",
+        args=(),
+        exc_info=None,
+    )
+
+    # Check that no callable attributes are in the set
+    for attr in attributes:
+        value = getattr(record, attr, None)
+        assert not callable(value), f"Attribute {attr} should not be callable"
+
+
+def test_get_builtin_logrecord_attributes_is_cached() -> None:
+    """get_builtin_logrecord_attributes is cached (same result on multiple calls)."""  # noqa: E501
+    attrs1 = get_builtin_logrecord_attributes()
+    attrs2 = get_builtin_logrecord_attributes()
+
+    # Should return the same set (cached)
+    assert attrs1 is attrs2
+
+
+def test_check_root_conflicts_reports_conflicts() -> None:
+    """_check_root_conflicts should report conflicts with reserved logging fields."""
+    problems: list[SchemaProblem] = []
+    schema_dict = {
+        "name": {
+            "Value": {"type": "str", "source": "value"},
+        },
+        "levelno": {
+            "Value": {"type": "int", "source": "value2"},
+        },
+    }
+
+    check_root_conflicts(schema_dict, problems)
+
+    assert len(problems) == 2
+    assert all("conflicts with reserved logging fields" in p.message for p in problems)
+
+
+def test_check_root_conflicts_no_conflicts() -> None:
+    """_check_root_conflicts should not report problems when no conflicts exist."""
+    problems: list[SchemaProblem] = []
+    schema_dict = {
+        "ServicePayload": {
+            "RequestID": {"type": "str", "source": "request_id"},
+        },
+        "UserPayload": {
+            "UserID": {"type": "int", "source": "user_id"},
+        },
+    }
+
+    check_root_conflicts(schema_dict, problems)
+
+    assert problems == []
+
+
+def test_check_root_conflicts_empty_schema() -> None:
+    """_check_root_conflicts should handle empty schema."""
+    problems: list[SchemaProblem] = []
+    schema_dict: dict[str, Any] = {}
+
+    check_root_conflicts(schema_dict, problems)
+
+    assert problems == []
