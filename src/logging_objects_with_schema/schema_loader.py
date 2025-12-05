@@ -544,7 +544,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     problems: list[SchemaProblem] = []
 
     try:
-        raw_schema, loaded_path = _load_raw_schema()
+        raw_schema, _ = _load_raw_schema()
     except (FileNotFoundError, ValueError) as exc:
         problems.append(SchemaProblem(str(exc)))
         result = (CompiledSchema(leaves=[]), problems)
@@ -569,10 +569,6 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     result = (compiled, problems)
 
     # Cache the result for this schema path (thread-safe write).
-    # NOTE: ``loaded_path`` is expected to be identical to ``schema_path`` here
-    # because both are derived from ``_get_schema_path()``. We still use
-    # ``schema_path`` as the cache key consistently to avoid any confusion if
-    # ``_load_raw_schema()`` implementation changes in the future.
     with _cache_lock:
         _SCHEMA_CACHE[schema_path] = result
 
