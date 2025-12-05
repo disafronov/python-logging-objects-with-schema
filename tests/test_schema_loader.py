@@ -53,6 +53,7 @@ from logging_objects_with_schema.schema_loader import (
 from logging_objects_with_schema.schema_loader import (
     _is_empty_or_none as is_empty_or_none,
 )
+from logging_objects_with_schema.schema_loader import _is_leaf_node as is_leaf_node
 from logging_objects_with_schema.schema_loader import (
     _load_raw_schema as load_raw_schema,
 )
@@ -1434,3 +1435,55 @@ def test_check_root_conflicts_empty_schema() -> None:
     check_root_conflicts(schema_dict, problems)
 
     assert problems == []
+
+
+def test_is_leaf_node_with_type() -> None:
+    """_is_leaf_node should return True for node with type field."""
+    value_dict = {"type": "str", "source": "request_id"}
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_with_source() -> None:
+    """_is_leaf_node should return True for node with source field."""
+    value_dict = {"source": "request_id"}
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_with_both_fields() -> None:
+    """_is_leaf_node should return True for node with both type and source."""
+    value_dict = {"type": "int", "source": "user_id"}
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_without_fields() -> None:
+    """_is_leaf_node should return False for inner node without type or source."""
+    value_dict = {"nested": {}}
+    assert is_leaf_node(value_dict) is False
+
+
+def test_is_leaf_node_with_empty_dict() -> None:
+    """_is_leaf_node should return False for empty dictionary."""
+    value_dict: dict[str, Any] = {}
+    assert is_leaf_node(value_dict) is False
+
+
+def test_is_leaf_node_with_type_none() -> None:
+    """_is_leaf_node should return True when type is None but source is present."""
+    value_dict = {"type": None, "source": "request_id"}
+    # Note: get() returns None, so "type" is None, but "source" is not None
+    # So this should still return True because source is present
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_with_source_none() -> None:
+    """_is_leaf_node should return True when source is None but type is present."""
+    value_dict = {"type": "str", "source": None}
+    # Note: get() returns None, so "source" is None, but "type" is not None
+    # So this should still return True because type is present
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_with_both_none() -> None:
+    """_is_leaf_node should return False when both type and source are None."""
+    value_dict = {"type": None, "source": None}
+    assert is_leaf_node(value_dict) is False
