@@ -6,10 +6,124 @@ to user-provided extra fields, used by SchemaLogger.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any, Dict, List, Mapping, MutableMapping, Tuple
 
 from .errors import DataProblem
 from .schema_loader import CompiledSchema, SchemaLeaf
+
+
+def _validate_list_value(
+    value: list,
+    source: str,
+    item_expected_type: type | None,
+) -> DataProblem | None:
+    """Validate that a list value matches the expected item type.
+
+    Validates that all elements in the list have the exact type declared by
+    ``item_expected_type``. Empty lists are always considered valid.
+
+    Args:
+        value: The list value to validate.
+        source: The source field name (for error messages).
+        item_expected_type: Expected type for list elements. Must not be None
+            for list-typed leaves.
+
+    Returns:
+        DataProblem if validation fails, None if validation succeeds.
+    """
+    if item_expected_type is None:
+        return DataProblem(
+            f"Field '{source}' is declared as list in schema but "
+            f"has no item type configured",
+        )
+
+    if len(value) == 0:
+        # Empty lists are always valid
+        return None
+
+    invalid_item_types = {
+        type(item).__name__ for item in value if type(item) is not item_expected_type
+    }
+
+    if invalid_item_types:
+        return DataProblem(
+            f"Field '{source}' is a list but contains elements "
+            f"with types {sorted(invalid_item_types)}; "
+            f"expected all elements to be of type "
+            f"{item_expected_type.__name__}",
+        )
+
+    return None
+
+
+def _set_nested_value(
+    target: MutableMapping[str, Any],
+    path: Tuple[str, ...],
+    value: Any,
+) -> None:
+    """Set a value in a nested dictionary structure following the given path.
+
+    Creates intermediate dictionaries as needed. The last element of the path
+    is used as the final key for the value.
+
+    Args:
+        target: The root dictionary to modify.
+        path: Tuple of keys representing the path to the target location.
+        value: The value to set at the target location.
+    """
+    current = target
+    for key in path[:-1]:
+        child = current.get(key)
+        if not isinstance(child, dict):
+            child = {}
+            current[key] = child
+        current = child
+
+    current[path[-1]] = value
+
+
+def _validate_and_apply_leaf(
+    leaf: SchemaLeaf,
+    value: Any,
+    source: str,
+    extra: MutableMapping[str, Any],
+    problems: List[DataProblem],
+) -> None:
+    """Validate a value against a schema leaf and apply it if valid.
+
+    Performs strict type checking and list validation. If validation passes,
+    the value is written to the target location in the extra dictionary.
+
+    Args:
+        leaf: The schema leaf to validate against.
+        value: The value to validate and apply.
+        source: The source field name (for error messages).
+        extra: The target dictionary to write the value to if validation passes.
+        problems: List to append validation problems to.
+    """
+    # Use strict type checking (type() is) instead of isinstance() to
+    # prevent bool values from passing validation for int types (since
+    # bool is a subclass of int). This ensures that the actual
+    # runtime type matches the schema type exactly.
+    if type(value) is not leaf.expected_type:
+        problems.append(
+            DataProblem(
+                f"Field '{source}' has type {type(value).__name__}, "
+                f"expected {leaf.expected_type.__name__}",
+            ),
+        )
+        return
+
+    # For lists, validate that all elements strictly match the declared
+    # item_expected_type (homogeneous primitive list).
+    if leaf.expected_type is list and isinstance(value, list):
+        list_problem = _validate_list_value(value, source, leaf.item_expected_type)
+        if list_problem is not None:
+            problems.append(list_problem)
+            return
+
+    _set_nested_value(extra, leaf.path, value)
 
 
 def _strip_empty(node: Any) -> Any:
@@ -95,9 +209,10 @@ def _apply_schema_internal(
 
     used_sources = {leaf.source for leaf in compiled.leaves}
 
-    source_to_leaves: Dict[str, List[SchemaLeaf]] = {}
+    # Group leaves by source for efficient processing
+    source_to_leaves: Dict[str, List[SchemaLeaf]] = defaultdict(list)
     for leaf in compiled.leaves:
-        source_to_leaves.setdefault(leaf.source, []).append(leaf)
+        source_to_leaves[leaf.source].append(leaf)
 
     for source, leaves in source_to_leaves.items():
         if source not in extra_values:
@@ -116,60 +231,7 @@ def _apply_schema_internal(
             continue
 
         for leaf in leaves:
-            # Use strict type checking (type() is) instead of isinstance() to
-            # prevent bool values from passing validation for int types (since
-            # bool is a subclass of int). This ensures that the actual
-            # runtime type matches the schema type exactly.
-            if type(value) is not leaf.expected_type:
-                problems.append(
-                    DataProblem(
-                        f"Field '{source}' has type {type(value).__name__}, "
-                        f"expected {leaf.expected_type.__name__}",
-                    ),
-                )
-                continue
-
-            # For lists, validate that all elements strictly match the declared
-            # item_expected_type (homogeneous primitive list).
-            if leaf.expected_type is list and isinstance(value, list):
-                item_expected_type = leaf.item_expected_type
-                # item_expected_type should always be set for list leaves by the
-                # schema compiler, but we guard defensively.
-                if item_expected_type is None:
-                    problems.append(
-                        DataProblem(
-                            f"Field '{source}' is declared as list in schema but "
-                            f"has no item type configured",
-                        ),
-                    )
-                    continue
-
-                if len(value) > 0:
-                    invalid_item_types = {
-                        type(item).__name__
-                        for item in value
-                        if type(item) is not item_expected_type
-                    }
-                    if invalid_item_types:
-                        problems.append(
-                            DataProblem(
-                                f"Field '{source}' is a list but contains elements "
-                                f"with types {sorted(invalid_item_types)}; "
-                                f"expected all elements to be of type "
-                                f"{item_expected_type.__name__}",
-                            ),
-                        )
-                        continue
-
-            target: MutableMapping[str, Any] = extra
-            for key in leaf.path[:-1]:
-                child = target.get(key)
-                if not isinstance(child, dict):
-                    child = {}
-                    target[key] = child
-                target = child
-
-            target[leaf.path[-1]] = value
+            _validate_and_apply_leaf(leaf, value, source, extra, problems)
 
     # Report redundant fields for any keys not referenced by schema leaves.
     for key in extra_values.keys():
