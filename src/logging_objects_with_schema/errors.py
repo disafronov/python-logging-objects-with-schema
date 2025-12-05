@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 
 @dataclass
@@ -40,10 +39,10 @@ class SchemaValidationError(Exception):
     """
 
     def __init__(
-        self, message: str, problems: List[SchemaProblem] | None = None
+        self, message: str, problems: list[SchemaProblem] | None = None
     ) -> None:
         super().__init__(message)
-        self.problems: List[SchemaProblem] = problems or []
+        self.problems: list[SchemaProblem] = problems or []
 
 
 @dataclass
@@ -80,6 +79,6 @@ class DataValidationError(Exception):
         ...     # Note: valid fields were already logged before this exception
     """
 
-    def __init__(self, message: str, problems: List[DataProblem] | None = None) -> None:
+    def __init__(self, message: str, problems: list[DataProblem] | None = None) -> None:
         super().__init__(message)
-        self.problems: List[DataProblem] = problems or []
+        self.problems: list[DataProblem] = problems or []
