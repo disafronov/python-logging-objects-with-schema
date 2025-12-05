@@ -10,12 +10,21 @@ from pathlib import Path
 
 import pytest
 
+from logging_objects_with_schema.errors import SchemaProblem
 from logging_objects_with_schema.schema_loader import (
     SCHEMA_FILE_NAME,
     CompiledSchema,
+    SchemaLeaf,
 )
 from logging_objects_with_schema.schema_loader import (
     _compile_schema_internal as compile_schema_internal,
+)
+from logging_objects_with_schema.schema_loader import _format_path as format_path
+from logging_objects_with_schema.schema_loader import (
+    _is_empty_or_none as is_empty_or_none,
+)
+from logging_objects_with_schema.schema_loader import (
+    _validate_and_create_leaf as validate_and_create_leaf,
 )
 from tests.conftest import _write_schema
 
@@ -521,3 +530,251 @@ def test_invalid_schema_result_is_cached_within_same_process(
     assert isinstance(compiled2, CompiledSchema)
     assert compiled2.is_empty
     assert problems2
+
+
+def test_format_path_without_key() -> None:
+    """_format_path should format path tuple without key."""
+    assert format_path(("Level1", "Level2")) == "Level1.Level2"
+    assert format_path(("ServicePayload",)) == "ServicePayload"
+    assert format_path(()) == ""
+
+
+def test_format_path_with_key() -> None:
+    """_format_path should format path tuple with additional key."""
+    assert format_path(("Level1", "Level2"), "Level3") == "Level1.Level2.Level3"
+    assert format_path(("ServicePayload",), "RequestID") == "ServicePayload.RequestID"
+    assert format_path((), "Root") == "Root"
+
+
+def test_is_empty_or_none_with_none() -> None:
+    """_is_empty_or_none should return True for None."""
+    assert is_empty_or_none(None) is True
+
+
+def test_is_empty_or_none_with_empty_string() -> None:
+    """_is_empty_or_none should return True for empty string."""
+    assert is_empty_or_none("") is True
+
+
+def test_is_empty_or_none_with_whitespace_only_string() -> None:
+    """_is_empty_or_none should return True for whitespace-only strings."""
+    assert is_empty_or_none("   ") is True
+    assert is_empty_or_none("\t\n") is True
+    assert is_empty_or_none(" \t \n ") is True
+
+
+def test_is_empty_or_none_with_valid_string() -> None:
+    """_is_empty_or_none should return False for non-empty strings."""
+    assert is_empty_or_none("valid") is False
+    assert is_empty_or_none("  valid  ") is False
+    assert is_empty_or_none("str") is False
+
+
+def test_is_empty_or_none_with_non_string_types() -> None:
+    """_is_empty_or_none should return False for non-string, non-None types."""
+    assert is_empty_or_none(0) is False
+    assert is_empty_or_none(42) is False
+    assert is_empty_or_none([]) is False
+    assert is_empty_or_none({}) is False
+    assert is_empty_or_none(True) is False
+
+
+def test_validate_and_create_leaf_valid_primitive() -> None:
+    """_validate_and_create_leaf should create SchemaLeaf for valid primitive type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "str", "source": "request_id"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is not None
+    assert isinstance(leaf, SchemaLeaf)
+    assert leaf.path == ("ServicePayload", "RequestID")
+    assert leaf.source == "request_id"
+    assert leaf.expected_type is str
+    assert leaf.item_expected_type is None
+    assert problems == []
+
+
+def test_validate_and_create_leaf_valid_list_type() -> None:
+    """_validate_and_create_leaf should create SchemaLeaf for valid list type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "list", "source": "tags", "item_type": "str"}
+
+    leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
+
+    assert leaf is not None
+    assert isinstance(leaf, SchemaLeaf)
+    assert leaf.path == ("ServicePayload", "Tags")
+    assert leaf.source == "tags"
+    assert leaf.expected_type is list
+    assert leaf.item_expected_type is str
+    assert problems == []
+
+
+def test_validate_and_create_leaf_missing_type() -> None:
+    """_validate_and_create_leaf should return None and add problem for missing type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"source": "request_id"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "type cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_missing_source() -> None:
+    """_validate_and_create_leaf should return None for missing source."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "str"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "source cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_empty_type() -> None:
+    """_validate_and_create_leaf should return None for empty type string."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "", "source": "request_id"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "type cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_whitespace_type() -> None:
+    """_validate_and_create_leaf should return None for whitespace-only type string."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "   ", "source": "request_id"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "type cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_empty_source() -> None:
+    """_validate_and_create_leaf should return None for empty source string."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "str", "source": ""}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "source cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_whitespace_source() -> None:
+    """_validate_and_create_leaf should return None for whitespace source."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "str", "source": "\t\n"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "source cannot be None or empty" in problems[0].message
+
+
+def test_validate_and_create_leaf_unknown_type() -> None:
+    """_validate_and_create_leaf should return None for unknown type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "unknown_type", "source": "request_id"}
+
+    leaf = validate_and_create_leaf(
+        value_dict, ("ServicePayload",), "RequestID", problems
+    )
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "Unknown type" in problems[0].message
+    assert "unknown_type" in problems[0].message
+
+
+def test_validate_and_create_leaf_list_missing_item_type() -> None:
+    """_validate_and_create_leaf should return None for list type without item_type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "list", "source": "tags"}
+
+    leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "item_type is required for list type" in problems[0].message
+
+
+def test_validate_and_create_leaf_list_empty_item_type() -> None:
+    """_validate_and_create_leaf should return None for empty item_type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "list", "source": "tags", "item_type": ""}
+
+    leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "item_type is required for list type" in problems[0].message
+
+
+def test_validate_and_create_leaf_list_invalid_item_type() -> None:
+    """_validate_and_create_leaf should return None for invalid item_type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "list", "source": "tags", "item_type": "list"}
+
+    leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "Invalid item_type" in problems[0].message
+    assert "only primitive item types" in problems[0].message
+
+
+def test_validate_and_create_leaf_list_unknown_item_type() -> None:
+    """_validate_and_create_leaf should return None for unknown item_type."""
+    problems: list[SchemaProblem] = []
+    value_dict = {"type": "list", "source": "tags", "item_type": "unknown"}
+
+    leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
+
+    assert leaf is None
+    assert len(problems) == 1
+    assert "Invalid item_type" in problems[0].message
+
+
+def test_validate_and_create_leaf_all_primitive_types() -> None:
+    """_validate_and_create_leaf should work with all primitive types."""
+    problems: list[SchemaProblem] = []
+
+    for type_name, expected_type in [
+        ("str", str),
+        ("int", int),
+        ("float", float),
+        ("bool", bool),
+    ]:
+        value_dict = {"type": type_name, "source": f"{type_name}_value"}
+        leaf = validate_and_create_leaf(value_dict, ("Payload",), "Value", problems)
+
+        assert leaf is not None
+        assert leaf.expected_type is expected_type
+        assert problems == []
+        problems.clear()
