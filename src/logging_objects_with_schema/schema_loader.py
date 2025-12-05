@@ -545,13 +545,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
 
     try:
         raw_schema, loaded_path = _load_raw_schema()
-    except FileNotFoundError as exc:
-        problems.append(SchemaProblem(str(exc)))
-        result = (CompiledSchema(leaves=[]), problems)
-        with _cache_lock:
-            _SCHEMA_CACHE[schema_path] = result
-        return result
-    except ValueError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         problems.append(SchemaProblem(str(exc)))
         result = (CompiledSchema(leaves=[]), problems)
         with _cache_lock:
