@@ -255,11 +255,14 @@ def _get_schema_path() -> Path:
         return _cache_and_return_missing_path()
 
 
-def _load_raw_schema() -> tuple[dict[str, Any], Path]:
+def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
     """Load raw JSON schema from the application root.
 
     This function always attempts to read the schema file and records
     any problems as :class:`SchemaProblem` instances.
+
+    Args:
+        schema_path: Absolute path to the schema file.
 
     Note:
         This helper is part of the internal implementation and is not
@@ -268,8 +271,6 @@ def _load_raw_schema() -> tuple[dict[str, Any], Path]:
     Returns:
         Tuple of (schema data, schema file path).
     """
-    schema_path = _get_schema_path()
-
     if not schema_path.exists():
         # Let the caller decide how to report this.
         raise FileNotFoundError(f"Schema file not found: {schema_path}")
@@ -580,7 +581,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     problems: list[SchemaProblem] = []
 
     try:
-        raw_schema, _ = _load_raw_schema()
+        raw_schema, _ = _load_raw_schema(schema_path)
     except (FileNotFoundError, ValueError) as exc:
         problems.append(SchemaProblem(str(exc)))
         result = _create_empty_compiled_schema_with_problems(problems)
