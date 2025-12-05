@@ -8,6 +8,7 @@ emitted and which Python types they must have.
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -325,6 +326,7 @@ def _compile_schema_tree(
                 yield child_leaf
 
 
+@functools.lru_cache(maxsize=1)
 def get_builtin_logrecord_attributes() -> set[str]:
     """Get set of standard LogRecord attribute names.
 
