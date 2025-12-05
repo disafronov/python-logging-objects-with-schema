@@ -1,0 +1,34 @@
+---
+name: Publish Release Candidate to Test PyPI
+
+"on":
+  push:
+    tags:
+      # Publish release candidate tags.
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc\.[0-9]+'
+  workflow_dispatch:
+
+jobs:
+  publish-rc:
+    name: "Publish RC to Test PyPI"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/
