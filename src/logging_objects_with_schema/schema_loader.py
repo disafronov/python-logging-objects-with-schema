@@ -322,6 +322,21 @@ def _is_empty_or_none(value: Any) -> bool:
     return value is None or (isinstance(value, str) and value.strip() == "")
 
 
+def _is_leaf_node(value_dict: dict[str, Any]) -> bool:
+    """Check if a schema node is a leaf node.
+
+    A leaf node is identified by having either 'type' or 'source' field.
+    Inner nodes have neither of these fields.
+
+    Args:
+        value_dict: Dictionary containing node data.
+
+    Returns:
+        True if the node is a leaf, False if it's an inner node.
+    """
+    return value_dict.get("type") is not None or value_dict.get("source") is not None
+
+
 def _validate_and_create_leaf(
     value_dict: dict[str, Any],
     path: tuple[str, ...],
@@ -445,10 +460,8 @@ def _compile_schema_tree(
             continue
 
         value_dict = dict(value)
-        leaf_type = value_dict.get("type")
-        leaf_source = value_dict.get("source")
 
-        if leaf_type is not None or leaf_source is not None:
+        if _is_leaf_node(value_dict):
             leaf = _validate_and_create_leaf(value_dict, path, key, problems)
             if leaf is not None:
                 yield leaf
