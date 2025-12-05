@@ -56,6 +56,20 @@ class CompiledSchema:
         return not self.leaves
 
 
+def _create_empty_compiled_schema_with_problems(
+    problems: list[SchemaProblem],
+) -> tuple[CompiledSchema, list[SchemaProblem]]:
+    """Create an empty CompiledSchema with problems.
+
+    Args:
+        problems: List of schema problems.
+
+    Returns:
+        Tuple of (empty CompiledSchema, problems list).
+    """
+    return (CompiledSchema(leaves=[]), problems)
+
+
 _TYPE_MAP: Mapping[str, type] = {
     "str": str,
     "int": int,
@@ -547,7 +561,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
         raw_schema, _ = _load_raw_schema()
     except (FileNotFoundError, ValueError) as exc:
         problems.append(SchemaProblem(str(exc)))
-        result = (CompiledSchema(leaves=[]), problems)
+        result = _create_empty_compiled_schema_with_problems(problems)
         with _cache_lock:
             _SCHEMA_CACHE[schema_path] = result
         return result
