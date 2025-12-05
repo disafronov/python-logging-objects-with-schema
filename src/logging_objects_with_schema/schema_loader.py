@@ -81,7 +81,8 @@ _TYPE_MAP: Mapping[str, type] = {
 # Module-level cache for compiled schemas.
 # Key: absolute schema_path, Value: (CompiledSchema, list[SchemaProblem])
 # This cache is thread-safe: all read and write operations are protected by
-# _cache_lock.
+# _cache_lock. Double-checked locking is used in _compile_schema_internal()
+# to prevent multiple threads from compiling the same schema simultaneously.
 _SCHEMA_CACHE: dict[Path, tuple[CompiledSchema, list[SchemaProblem]]] = {}
 
 _cache_lock = threading.RLock()
@@ -585,7 +586,12 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     except (FileNotFoundError, ValueError) as exc:
         problems.append(SchemaProblem(str(exc)))
         result = _create_empty_compiled_schema_with_problems(problems)
+        # Double-checked locking: another thread might have compiled the schema
+        # while we were handling the error.
         with _cache_lock:
+            cached = _SCHEMA_CACHE.get(schema_path)
+            if cached is not None:
+                return cached
             _SCHEMA_CACHE[schema_path] = result
         return result
 
@@ -605,8 +611,12 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     compiled = CompiledSchema(leaves=leaves)
     result = (compiled, problems)
 
-    # Cache the result for this schema path (thread-safe write).
+    # Double-checked locking: another thread might have compiled the schema
+    # while we were compiling it.
     with _cache_lock:
+        cached = _SCHEMA_CACHE.get(schema_path)
+        if cached is not None:
+            return cached
         _SCHEMA_CACHE[schema_path] = result
 
     return result
