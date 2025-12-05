@@ -51,7 +51,15 @@ class SchemaLogger(logging.Logger):
 
         try:
             compiled, problems = _compile_schema_internal()
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
+            # Catch specific exceptions that can occur during schema compilation:
+            # - OSError: file system issues (e.g., os.getcwd() failures,
+            #   permission errors)
+            # - ValueError: data validation issues (e.g., JSON parsing,
+            #   schema structure)
+            # - RuntimeError: threading issues (e.g., lock acquisition problems)
+            # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
+            # caught, which is the correct behavior.
             # Ensure that a partially initialised logger instance is not left
             # registered in the logging manager if schema compilation fails.
             # Otherwise, subsequent logging.getLogger(name) calls could return
