@@ -12,6 +12,7 @@ import pytest
 
 from logging_objects_with_schema.errors import SchemaProblem
 from logging_objects_with_schema.schema_loader import (
+    MAX_SCHEMA_DEPTH,
     SCHEMA_FILE_NAME,
     CompiledSchema,
     SchemaLeaf,
@@ -20,6 +21,9 @@ from logging_objects_with_schema.schema_loader import (
     _compile_schema_internal as compile_schema_internal,
 )
 from logging_objects_with_schema.schema_loader import _format_path as format_path
+from logging_objects_with_schema.schema_loader import (
+    _get_schema_path as get_schema_path,
+)
 from logging_objects_with_schema.schema_loader import (
     _is_empty_or_none as is_empty_or_none,
 )
@@ -778,3 +782,150 @@ def test_validate_and_create_leaf_all_primitive_types() -> None:
         assert leaf.expected_type is expected_type
         assert problems == []
         problems.clear()
+
+
+def test_schema_exceeds_max_depth_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Schema exceeding MAX_SCHEMA_DEPTH should produce problem."""
+
+    monkeypatch.chdir(tmp_path)
+
+    # Create a schema that exceeds MAX_SCHEMA_DEPTH (100 levels)
+    # We'll create a path with MAX_SCHEMA_DEPTH + 1 levels
+    schema = {}
+    current = schema
+    for i in range(MAX_SCHEMA_DEPTH + 1):
+        current[f"Level{i}"] = {}
+        current = current[f"Level{i}"]
+
+    # Add a leaf at the deepest level
+    current["Value"] = {"type": "str", "source": "value"}
+
+    _write_schema(tmp_path, schema)
+
+    compiled, problems = compile_schema_internal()
+
+    assert isinstance(compiled, CompiledSchema)
+    assert compiled.is_empty
+    assert any(
+        "exceeds maximum allowed depth" in p.message
+        and str(MAX_SCHEMA_DEPTH) in p.message
+        for p in problems
+    )
+
+
+def test_schema_at_max_depth_compiles_correctly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Schema at exactly MAX_SCHEMA_DEPTH should compile correctly."""
+
+    monkeypatch.chdir(tmp_path)
+
+    # Create a schema at exactly MAX_SCHEMA_DEPTH levels
+    schema = {}
+    current = schema
+    for i in range(MAX_SCHEMA_DEPTH):
+        current[f"Level{i}"] = {}
+        current = current[f"Level{i}"]
+
+    # Add a leaf at the deepest level
+    current["Value"] = {"type": "str", "source": "value"}
+
+    _write_schema(tmp_path, schema)
+
+    compiled, problems = compile_schema_internal()
+
+    assert isinstance(compiled, CompiledSchema)
+    assert not compiled.is_empty
+    assert len(compiled.leaves) == 1
+    assert compiled.leaves[0].source == "value"
+    assert problems == []
+
+
+def test_get_schema_path_cached_file_deleted_re_searches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_schema_path should re-search if cached file is deleted."""
+
+    monkeypatch.chdir(tmp_path)
+
+    # Create schema file
+    _write_schema(
+        tmp_path,
+        {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
+    )
+
+    # First call - should find and cache the file
+    path1 = get_schema_path()
+    assert path1.exists()
+
+    # Delete the file
+    path1.unlink()
+    assert not path1.exists()
+
+    # Second call - should re-search and return path in current directory
+    path2 = get_schema_path()
+    assert path2 == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert not path2.exists()
+
+
+def test_get_schema_path_cwd_change_invalidates_cache_when_file_not_found(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_schema_path should invalidate cache when CWD changes and file not found."""
+
+    # Create two directories
+    dir1 = tmp_path / "dir1"
+    dir2 = tmp_path / "dir2"
+    dir1.mkdir()
+    dir2.mkdir()
+
+    # Start in dir1 (no schema file)
+    monkeypatch.chdir(dir1)
+    path1 = get_schema_path()
+    assert path1 == (dir1 / SCHEMA_FILE_NAME).resolve()
+    assert not path1.exists()
+
+    # Change to dir2 (still no schema file, but different path expected)
+    monkeypatch.chdir(dir2)
+    path2 = get_schema_path()
+    assert path2 == (dir2 / SCHEMA_FILE_NAME).resolve()
+    assert path2 != path1
+
+
+def test_get_schema_path_cwd_change_preserves_cache_when_file_found(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_schema_path should preserve cache when CWD changes but file was found."""
+
+    # Create schema file in root
+    _write_schema(
+        tmp_path,
+        {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
+    )
+
+    # Create subdirectory
+    sub_dir = tmp_path / "subdir"
+    sub_dir.mkdir()
+
+    # Start in subdirectory - should find file in parent
+    monkeypatch.chdir(sub_dir)
+    path1 = get_schema_path()
+    assert path1.exists()
+    assert path1 == (tmp_path / SCHEMA_FILE_NAME).resolve()
+
+    # Change to another subdirectory
+    sub_dir2 = tmp_path / "subdir2"
+    sub_dir2.mkdir()
+    monkeypatch.chdir(sub_dir2)
+
+    # Should still return cached path (CWD-independent)
+    path2 = get_schema_path()
+    assert path2 == path1
+    assert path2.exists()
