@@ -144,6 +144,11 @@ except SchemaValidationError as e:
         print(f"  - {problem.message}")
     # Decide whether to abort or continue with default logger
     raise
+except (OSError, RuntimeError) as e:
+    # System-level errors (e.g., inaccessible working directory, lock failures)
+    # are raised directly, not wrapped in SchemaValidationError
+    print(f"System error during logger initialization: {e}")
+    raise
 
 # When logging, handle DataValidationError
 try:
