@@ -10,12 +10,25 @@ from pathlib import Path
 
 import pytest
 
+import logging_objects_with_schema.schema_loader as schema_loader
 from logging_objects_with_schema.errors import SchemaProblem
 from logging_objects_with_schema.schema_loader import (
     MAX_SCHEMA_DEPTH,
     SCHEMA_FILE_NAME,
     CompiledSchema,
     SchemaLeaf,
+)
+from logging_objects_with_schema.schema_loader import (
+    _cache_and_return_found_path as cache_and_return_found_path,
+)
+from logging_objects_with_schema.schema_loader import (
+    _cache_and_return_missing_path as cache_and_return_missing_path,
+)
+from logging_objects_with_schema.schema_loader import (
+    _check_cached_found_file_path as check_cached_found_file_path,
+)
+from logging_objects_with_schema.schema_loader import (
+    _check_cached_missing_file_path as check_cached_missing_file_path,
 )
 from logging_objects_with_schema.schema_loader import (
     _compile_schema_internal as compile_schema_internal,
@@ -929,3 +942,163 @@ def test_get_schema_path_cwd_change_preserves_cache_when_file_found(
     path2 = get_schema_path()
     assert path2 == path1
     assert path2.exists()
+
+
+def test_check_cached_found_file_path_returns_path_when_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_check_cached_found_file_path should return path when file exists."""
+
+    monkeypatch.chdir(tmp_path)
+
+    # Create schema file
+    schema_file = tmp_path / SCHEMA_FILE_NAME
+    _write_schema(
+        tmp_path,
+        {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
+    )
+
+    # Cache the path
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = schema_file.resolve()
+        schema_loader._cached_cwd = None
+
+        # Should return cached path
+        result = check_cached_found_file_path()
+        assert result == schema_file.resolve()
+        assert result.exists()
+
+
+def test_check_cached_found_file_path_returns_none_when_file_deleted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_check_cached_found_file_path should return None when file is deleted."""
+
+    monkeypatch.chdir(tmp_path)
+
+    # Create and cache schema file
+    schema_file = tmp_path / SCHEMA_FILE_NAME
+    _write_schema(
+        tmp_path,
+        {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
+    )
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = schema_file.resolve()
+        schema_loader._cached_cwd = None
+
+        # Delete the file
+        schema_file.unlink()
+
+        # Should return None and invalidate cache
+        result = check_cached_found_file_path()
+        assert result is None
+        assert schema_loader._resolved_schema_path is None
+
+
+def test_check_cached_found_file_path_returns_none_when_no_cache() -> None:
+    """_check_cached_found_file_path should return None when no cache exists."""
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = None
+
+        result = check_cached_found_file_path()
+        assert result is None
+
+
+def test_check_cached_missing_file_path_returns_path_when_cwd_unchanged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_check_cached_missing_file_path should return path when CWD unchanged."""
+
+    monkeypatch.chdir(tmp_path)
+
+    expected_path = (tmp_path / SCHEMA_FILE_NAME).resolve()
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = expected_path
+        schema_loader._cached_cwd = tmp_path.resolve()
+
+        result = check_cached_missing_file_path()
+        assert result == expected_path
+
+
+def test_check_cached_missing_file_path_returns_none_when_cwd_changed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_check_cached_missing_file_path should return None when CWD changed."""
+
+    dir1 = tmp_path / "dir1"
+    dir2 = tmp_path / "dir2"
+    dir1.mkdir()
+    dir2.mkdir()
+
+    monkeypatch.chdir(dir1)
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = (dir1 / SCHEMA_FILE_NAME).resolve()
+        schema_loader._cached_cwd = dir1.resolve()
+
+        # Change CWD
+        monkeypatch.chdir(dir2)
+
+        # Should return None and invalidate cache
+        result = check_cached_missing_file_path()
+        assert result is None
+        assert schema_loader._resolved_schema_path is None
+        assert schema_loader._cached_cwd is None
+
+
+def test_check_cached_missing_file_path_returns_none_when_no_cache() -> None:
+    """_check_cached_missing_file_path should return None when no cache exists."""
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = None
+        schema_loader._cached_cwd = None
+
+        result = check_cached_missing_file_path()
+        assert result is None
+
+
+def test_cache_and_return_found_path_caches_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_cache_and_return_found_path should cache and return found path."""
+
+    monkeypatch.chdir(tmp_path)
+
+    schema_file = tmp_path / SCHEMA_FILE_NAME
+    _write_schema(
+        tmp_path,
+        {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
+    )
+
+    with schema_loader._path_cache_lock:
+        result = cache_and_return_found_path(schema_file.resolve())
+
+        assert result == schema_file.resolve()
+        assert schema_loader._resolved_schema_path == schema_file.resolve()
+        assert schema_loader._cached_cwd is None
+
+
+def test_cache_and_return_missing_path_caches_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_cache_and_return_missing_path should cache and return missing path."""
+
+    monkeypatch.chdir(tmp_path)
+
+    expected_path = (tmp_path / SCHEMA_FILE_NAME).resolve()
+
+    with schema_loader._path_cache_lock:
+        result = cache_and_return_missing_path()
+
+        assert result == expected_path
+        assert schema_loader._resolved_schema_path == expected_path
+        assert schema_loader._cached_cwd == tmp_path.resolve()

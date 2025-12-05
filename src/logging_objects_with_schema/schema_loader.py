@@ -109,6 +109,88 @@ def _find_schema_file() -> Path | None:
     return None
 
 
+def _check_cached_found_file_path() -> Path | None:
+    """Check if cached path for a found file is still valid.
+
+    When a schema file was found, its absolute path is cached as CWD-independent.
+    This function checks if the cached path still exists on disk.
+
+    Returns:
+        Cached path if file still exists, None if file was deleted (cache invalidated).
+    """
+    global _resolved_schema_path
+
+    if _resolved_schema_path is None:
+        return None
+
+    # Schema file was found, absolute path doesn't depend on CWD
+    # Return it if it still exists
+    if _resolved_schema_path.exists():
+        return _resolved_schema_path
+
+    # If cached path doesn't exist, re-search (schema might have been moved)
+    _resolved_schema_path = None
+    return None
+
+
+def _check_cached_missing_file_path() -> Path | None:
+    """Check if cached path for a missing file is still valid.
+
+    When a schema file was not found, a path based on CWD is cached.
+    This function checks if CWD has changed since caching.
+
+    Returns:
+        Cached path if CWD unchanged, None if CWD changed (cache invalidated).
+    """
+    global _resolved_schema_path, _cached_cwd
+
+    if _resolved_schema_path is None or _cached_cwd is None:
+        return None
+
+    # Cached path is based on CWD when file was not found,
+    # check if CWD changed
+    current_cwd = Path(os.getcwd()).resolve()
+    if current_cwd != _cached_cwd:
+        # CWD changed, invalidate cache and re-search from new CWD
+        _resolved_schema_path = None
+        _cached_cwd = None
+        return None
+
+    # CWD unchanged, return cached path
+    return _resolved_schema_path
+
+
+def _cache_and_return_found_path(found_path: Path) -> Path:
+    """Cache a found schema file path and return it.
+
+    Args:
+        found_path: Absolute path to the found schema file.
+
+    Returns:
+        The cached path (CWD-independent).
+    """
+    global _resolved_schema_path, _cached_cwd
+
+    _resolved_schema_path = found_path
+    _cached_cwd = None  # Absolute path doesn't depend on CWD
+    return found_path
+
+
+def _cache_and_return_missing_path() -> Path:
+    """Cache a missing schema file path and return it.
+
+    Returns:
+        Absolute path in current working directory where schema file is expected.
+    """
+    global _resolved_schema_path, _cached_cwd
+
+    current_cwd = Path(os.getcwd()).resolve()
+    schema_path = (current_cwd / SCHEMA_FILE_NAME).resolve()
+    _resolved_schema_path = schema_path
+    _cached_cwd = current_cwd  # Track CWD since path depends on it
+    return schema_path
+
+
 def _get_schema_path() -> Path:
     """Resolve the absolute path to the JSON schema file with caching semantics.
 
@@ -129,44 +211,25 @@ def _get_schema_path() -> Path:
     Returns:
         Absolute path where the schema file is located or expected to be.
     """
-    global _resolved_schema_path, _cached_cwd
-
     with _path_cache_lock:
-        if _resolved_schema_path is not None:
-            # If cached path is an absolute path to a found file (CWD-independent)
-            if _cached_cwd is None:
-                # Schema file was found, absolute path doesn't depend on CWD
-                # Return it if it still exists
-                if _resolved_schema_path.exists():
-                    return _resolved_schema_path
-                # If cached path doesn't exist, re-search (schema might have been moved)
-                _resolved_schema_path = None
-            else:
-                # Cached path is based on CWD when file was not found,
-                # check if CWD changed
-                current_cwd = Path(os.getcwd()).resolve()
-                if current_cwd != _cached_cwd:
-                    # CWD changed, invalidate cache and re-search from new CWD
-                    _resolved_schema_path = None
-                    _cached_cwd = None
-                else:
-                    # CWD unchanged, return cached path
-                    return _resolved_schema_path
+        # Check cached path for found file (CWD-independent)
+        cached_path = _check_cached_found_file_path()
+        if cached_path is not None:
+            return cached_path
+
+        # Check cached path for missing file (CWD-dependent)
+        cached_path = _check_cached_missing_file_path()
+        if cached_path is not None:
+            return cached_path
 
         # Search for schema file
         found_path = _find_schema_file()
         if found_path is not None:
-            _resolved_schema_path = found_path
-            _cached_cwd = None  # Absolute path doesn't depend on CWD
-            return found_path
+            return _cache_and_return_found_path(found_path)
 
         # Schema file not found, return absolute path in current working directory
         # (this path may not exist, but allows caller to report proper error)
-        current_cwd = Path(os.getcwd()).resolve()
-        schema_path = (current_cwd / SCHEMA_FILE_NAME).resolve()
-        _resolved_schema_path = schema_path
-        _cached_cwd = current_cwd  # Track CWD since path depends on it
-        return schema_path
+        return _cache_and_return_missing_path()
 
 
 def _load_raw_schema() -> tuple[dict[str, Any], Path]:
