@@ -15,7 +15,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Tuple
+from typing import Any, Iterable, Mapping, MutableMapping
 
 from .errors import SchemaProblem
 
@@ -37,7 +37,7 @@ class SchemaLeaf:
             ``expected_type`` is ``list``. For non-list leaves this is ``None``.
     """
 
-    path: Tuple[str, ...]
+    path: tuple[str, ...]
     source: str
     expected_type: type
     item_expected_type: type | None = None
@@ -47,7 +47,7 @@ class SchemaLeaf:
 class CompiledSchema:
     """Internal representation of a compiled schema."""
 
-    leaves: List[SchemaLeaf]
+    leaves: list[SchemaLeaf]
 
     @property
     def is_empty(self) -> bool:
@@ -65,10 +65,10 @@ _TYPE_MAP: Mapping[str, type] = {
 }
 
 # Module-level cache for compiled schemas.
-# Key: absolute schema_path, Value: (CompiledSchema, List[SchemaProblem])
+# Key: absolute schema_path, Value: (CompiledSchema, list[SchemaProblem])
 # This cache is thread-safe: all read and write operations are protected by
 # _cache_lock.
-_SCHEMA_CACHE: Dict[Path, Tuple[CompiledSchema, List[SchemaProblem]]] = {}
+_SCHEMA_CACHE: dict[Path, tuple[CompiledSchema, list[SchemaProblem]]] = {}
 
 _cache_lock = threading.RLock()
 
@@ -169,7 +169,7 @@ def _get_schema_path() -> Path:
         return schema_path
 
 
-def _load_raw_schema() -> Tuple[Dict[str, Any], Path]:
+def _load_raw_schema() -> tuple[dict[str, Any], Path]:
     """Load raw JSON schema from the application root.
 
     This function always attempts to read the schema file and records
@@ -238,8 +238,8 @@ def _is_empty_or_none(value: Any) -> bool:
 
 def _compile_schema_tree(
     node: MutableMapping[str, Any],
-    path: Tuple[str, ...],
-    problems: List[SchemaProblem],
+    path: tuple[str, ...],
+    problems: list[SchemaProblem],
 ) -> Iterable[SchemaLeaf]:
     """Recursively compile a schema node into SchemaLeaf objects.
 
@@ -399,7 +399,7 @@ def get_builtin_logrecord_attributes() -> set[str]:
 
 
 def _check_root_conflicts(
-    schema_dict: Mapping[str, Any], problems: List[SchemaProblem]
+    schema_dict: Mapping[str, Any], problems: list[SchemaProblem]
 ) -> None:
     """Check schema root keys for conflicts with reserved logging fields."""
 
@@ -414,7 +414,7 @@ def _check_root_conflicts(
             )
 
 
-def _compile_schema_internal() -> Tuple[CompiledSchema, List[SchemaProblem]]:
+def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     """Compile JSON schema into ``CompiledSchema`` and collect all problems.
 
     The function loads the raw JSON schema, validates its structure, checks
@@ -424,7 +424,7 @@ def _compile_schema_internal() -> Tuple[CompiledSchema, List[SchemaProblem]]:
     instances.
 
     Results are cached process-wide: the cache key is the absolute schema
-    file path and the value is a tuple ``(CompiledSchema, List[SchemaProblem])``.
+    file path and the value is a tuple ``(CompiledSchema, list[SchemaProblem])``.
     Once a schema for a given path has been observed (including the cases when
     it is missing or invalid), subsequent calls always return the cached result
     without re-reading or re-compiling the schema. To pick up on-disk changes
@@ -442,7 +442,7 @@ def _compile_schema_internal() -> Tuple[CompiledSchema, List[SchemaProblem]]:
         between releases without preserving backward compatibility.
 
     Returns:
-        Tuple of (CompiledSchema, List[SchemaProblem]).
+        Tuple of (CompiledSchema, list[SchemaProblem]).
     """
     schema_path = _get_schema_path().resolve()
 
@@ -453,7 +453,7 @@ def _compile_schema_internal() -> Tuple[CompiledSchema, List[SchemaProblem]]:
     if cached is not None:
         return cached
 
-    problems: List[SchemaProblem] = []
+    problems: list[SchemaProblem] = []
 
     try:
         raw_schema, loaded_path = _load_raw_schema()
@@ -472,7 +472,7 @@ def _compile_schema_internal() -> Tuple[CompiledSchema, List[SchemaProblem]]:
 
     _check_root_conflicts(raw_schema, problems)
 
-    leaves: List[SchemaLeaf] = []
+    leaves: list[SchemaLeaf] = []
     for key, value in raw_schema.items():
         if not isinstance(value, Mapping):
             problems.append(
