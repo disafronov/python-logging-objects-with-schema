@@ -1199,12 +1199,13 @@ def test_load_raw_schema_loads_valid_schema(
     }
     _write_schema(tmp_path, schema_data)
 
-    data, schema_path = load_raw_schema()
+    schema_path = get_schema_path()
+    data, returned_schema_path = load_raw_schema(schema_path)
 
     assert isinstance(data, dict)
     assert data == schema_data
-    assert schema_path == (tmp_path / SCHEMA_FILE_NAME).resolve()
-    assert schema_path.exists()
+    assert returned_schema_path == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert returned_schema_path.exists()
 
 
 def test_load_raw_schema_raises_file_not_found_when_missing(
@@ -1214,8 +1215,9 @@ def test_load_raw_schema_raises_file_not_found_when_missing(
     """_load_raw_schema should raise FileNotFoundError when schema file is missing."""
     monkeypatch.chdir(tmp_path)
 
+    schema_path = get_schema_path()
     with pytest.raises(FileNotFoundError) as exc_info:
-        load_raw_schema()
+        load_raw_schema(schema_path)
 
     assert "Schema file not found" in str(exc_info.value)
     assert SCHEMA_FILE_NAME in str(exc_info.value)
@@ -1230,8 +1232,9 @@ def test_load_raw_schema_raises_value_error_for_invalid_json(
     schema_file = tmp_path / SCHEMA_FILE_NAME
     schema_file.write_text("{ invalid json }", encoding="utf-8")
 
+    schema_path = get_schema_path()
     with pytest.raises(ValueError) as exc_info:
-        load_raw_schema()
+        load_raw_schema(schema_path)
 
     assert "Failed to parse JSON schema" in str(exc_info.value)
 
@@ -1246,8 +1249,9 @@ def test_load_raw_schema_raises_value_error_for_non_object(
     # Write a JSON array instead of an object
     schema_file.write_text('["not", "an", "object"]', encoding="utf-8")
 
+    schema_path = get_schema_path()
     with pytest.raises(ValueError) as exc_info:
-        load_raw_schema()
+        load_raw_schema(schema_path)
 
     assert "Top-level schema must be a JSON object" in str(exc_info.value)
 
