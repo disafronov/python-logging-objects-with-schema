@@ -218,7 +218,7 @@ def _apply_schema_internal(
         if source not in extra_values:
             continue
 
-        value = extra_values.get(source)
+        value = extra_values[source]
 
         # Check for None values explicitly (None values are not allowed)
         # This check must be done once per source, not once per leaf
