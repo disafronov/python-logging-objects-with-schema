@@ -13,10 +13,7 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.errors import (
-    DataValidationError,
-    SchemaValidationError,
-)
+from logging_objects_with_schema.errors import SchemaValidationError
 from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
 from tests.conftest import _write_schema
 
@@ -245,7 +242,7 @@ def test_logger_validates_data_after_logging(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Logger should raise DataValidationError after logging invalid data."""
+    """Logger should log validation errors as ERROR messages after logging."""
 
     monkeypatch.chdir(tmp_path)
     _write_schema(
@@ -259,21 +256,21 @@ def test_logger_validates_data_after_logging(
 
     stream = StringIO()
     handler = logging.StreamHandler(stream)
-    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger = SchemaLogger("test")
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-    # Log with invalid type
-    with pytest.raises(DataValidationError) as exc_info:
-        logger.info("message", extra={"user_id": "not-an-int"})
+    # Log with invalid type - should not raise exception
+    logger.info("message", extra={"user_id": "not-an-int"})
 
-    # Message should be logged before exception
+    # Message should be logged
     output = stream.getvalue()
     assert "message" in output
 
-    # Exception should be DataValidationError
-    assert isinstance(exc_info.value, DataValidationError)
+    # Validation error should be logged as ERROR
+    assert "ERROR" in output
+    assert "Log data does not match schema" in output
 
 
 def test_logger_with_empty_schema(
@@ -287,28 +284,26 @@ def test_logger_with_empty_schema(
 
     stream = StringIO()
     handler = logging.StreamHandler(stream)
-    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger = SchemaLogger("test")
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
     # Log with extra fields: they should still be ignored in payload, but
     # treated as data errors because schema defines no valid leaves.
-    with pytest.raises(DataValidationError) as exc_info:
-        logger.info("message", extra={"unknown_field": "value", "another": 42})
+    logger.info("message", extra={"unknown_field": "value", "another": 42})
 
-    # Message should be logged before exception is raised.
+    # Message should be logged
     output = stream.getvalue()
     assert "message" in output
     assert "unknown_field" not in output
     assert "another" not in output
 
-    # Both fields should be reported as problems.
-    messages = [p.message for p in exc_info.value.problems]
-    assert (
-        "Field 'unknown_field' is not defined in schema and will be ignored" in messages
-    )
-    assert "Field 'another' is not defined in schema and will be ignored" in messages
+    # Validation error should be logged as ERROR
+    assert "ERROR" in output
+    assert "Log data does not match schema" in output
+    # Traceback should be present in the output
+    assert "Traceback" in output
 
 
 def test_schema_file_permission_error_raises_schema_validation_error(
