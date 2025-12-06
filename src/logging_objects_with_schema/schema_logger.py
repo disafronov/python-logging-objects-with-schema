@@ -136,8 +136,10 @@ class SchemaLogger(logging.Logger):
 
         if data_problems:
             # Log validation errors as ERROR messages
-            # Use stacklevel + 1 to account for this override frame, same as
-            # in the main logging call above, so caller info points to user code.
+            # Use the same stacklevel as for the main logging call (stacklevel + 1)
+            # to ensure caller info points to the same user code location.
+            # findCaller is called from within _log, but it accounts for its own frame,
+            # so we use the same stacklevel adjustment as super()._log() above.
             fn, lno, func, sinfo = self.findCaller(
                 stack_info=False, stacklevel=stacklevel + 1
             )
