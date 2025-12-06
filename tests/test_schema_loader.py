@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import _write_schema
 
 import logging_objects_with_schema.schema_loader as schema_loader
 from logging_objects_with_schema.errors import SchemaProblem
@@ -63,7 +64,6 @@ from logging_objects_with_schema.schema_loader import (
 from logging_objects_with_schema.schema_loader import (
     get_builtin_logrecord_attributes,
 )
-from tests.conftest import _write_schema
 
 
 def test_missing_schema_file_produces_empty_schema_and_problem(
