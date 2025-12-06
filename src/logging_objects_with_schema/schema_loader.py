@@ -280,9 +280,11 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
         with schema_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
     except OSError as exc:
-        # Normalise I/O errors to ValueError so that _compile_schema_internal()
+        # Normalise I/O errors when reading the schema file (e.g., permission
+        # denied, file not found) to ValueError so that _compile_schema_internal()
         # can report them as SchemaProblem instances instead of leaking raw
-        # OSError to callers.
+        # OSError to callers. Note: System-level OSError (e.g., from os.getcwd())
+        # is not caught here and propagates directly.
         raise ValueError(
             f"Failed to read schema file {schema_path}: {exc}",
         ) from exc
