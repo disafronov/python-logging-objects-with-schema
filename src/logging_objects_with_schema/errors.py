@@ -17,11 +17,12 @@ class SchemaProblem:
 
 
 class SchemaValidationError(Exception):
-    """Raised when there are problems with the JSON schema definition.
+    """Exception for schema validation problems (deprecated).
 
-    This exception is raised during SchemaLogger initialization when the schema
-    file cannot be loaded, parsed, or validated. The logger instance will not
-    be created if this exception is raised.
+    This exception class is kept for backward compatibility but is no longer
+    raised by :class:`SchemaLogger` during initialization. Schema problems are
+    now handled internally: errors are logged to stderr and the application
+    is terminated via ``os._exit(1)``.
 
     The human-readable summary is stored in the exception message, while
     detailed information about each violation is available in the ``problems``
@@ -30,12 +31,10 @@ class SchemaValidationError(Exception):
     Attributes:
         problems: List of SchemaProblem instances describing each validation issue.
 
-    Example:
-        >>> try:
-        ...     logger = SchemaLogger("my_logger")
-        ... except SchemaValidationError as e:
-        ...     for problem in e.problems:
-        ...         print(f"Schema error: {problem.message}")
+    Note:
+        This exception may still be used internally or in tests, but
+        applications should not expect to catch it when creating SchemaLogger
+        instances.
     """
 
     def __init__(

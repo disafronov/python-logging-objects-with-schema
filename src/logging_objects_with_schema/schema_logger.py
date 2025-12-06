@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 import sys
 from collections.abc import Mapping
 from typing import Any
 
-from .errors import SchemaValidationError
+from .errors import SchemaProblem
 from .schema_applier import _apply_schema_internal
 from .schema_loader import CompiledSchema, _compile_schema_internal
 
@@ -29,7 +30,8 @@ class SchemaLogger(logging.Logger):
 
     The schema is loaded from ``logging_objects_with_schema.json`` in the
     application root directory during initialization. If the schema cannot
-    be loaded or validated, a :class:`SchemaValidationError` is raised.
+    be loaded or validated, the logger instance is not created, schema
+    problems are logged to stderr, and the application is terminated.
 
     Example:
         >>> import logging
@@ -43,8 +45,9 @@ class SchemaLogger(logging.Logger):
         """Initialise the schema-aware logger.
 
         The schema is compiled once during construction. If any
-        problems are detected in the schema, a SchemaValidationError
-        will be raised and this logger instance is not usable.
+        problems are detected in the schema, the logger instance is not
+        created, schema problems are logged to stderr, and the application
+        is terminated.
 
         Args:
             name: Logger name (same as :class:`logging.Logger`).
@@ -54,13 +57,14 @@ class SchemaLogger(logging.Logger):
 
         try:
             compiled, problems = _compile_schema_internal()
-        except (OSError, ValueError, RuntimeError):
-            # Catch specific exceptions that can occur during schema compilation:
+        except (OSError, ValueError, RuntimeError) as exc:
+            # Convert system-level exceptions to SchemaProblem so they can be
+            # handled the same way as schema validation problems.
             # - OSError: system-level file system issues (e.g., os.getcwd() failures
             #   when the current working directory is inaccessible or deleted).
             #   Note: OSError that occurs when reading the schema file (e.g., permission
-            #   denied, I/O errors) is converted to SchemaValidationError in
-            #   _load_raw_schema() and does not reach this exception handler.
+            #   denied, I/O errors) is converted to SchemaProblem in _load_raw_schema()
+            #   and does not reach this exception handler.
             # - ValueError: path resolution issues (e.g., invalid path characters,
             #   malformed paths during schema file discovery)
             # - RuntimeError: threading issues (e.g., lock acquisition problems)
@@ -68,18 +72,15 @@ class SchemaLogger(logging.Logger):
             # converted to SchemaProblem instances and do not raise ValueError here.
             # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
             # caught, which is the correct behavior.
-            # Ensure that a partially initialised logger instance is not left
-            # registered in the logging manager if schema compilation fails.
-            # Otherwise, subsequent logging.getLogger(name) calls could return
-            # this broken instance and lead to AttributeError at runtime.
-            self._cleanup_failed_logger()
-            raise
+            problems = [SchemaProblem(f"Schema compilation failed: {exc}")]
+            compiled = CompiledSchema(leaves=[])
 
         if problems:
             # Schema is invalid; remove this instance from the logging manager
-            # cache before raising, for the same reason as above.
+            # cache before logging and terminating, to prevent broken logger
+            # instances from being cached and reused.
             self._cleanup_failed_logger()
-            raise SchemaValidationError("Schema has problems", problems=problems)
+            self._log_schema_problems_and_exit(problems, name)
 
         self._schema: CompiledSchema = compiled
 
@@ -90,6 +91,23 @@ class SchemaLogger(logging.Logger):
         instances from being cached and reused.
         """
         self.manager.loggerDict.pop(self.name, None)
+
+    def _log_schema_problems_and_exit(
+        self, problems: list[SchemaProblem], logger_name: str
+    ) -> None:
+        """Log schema problems to stderr and terminate the application.
+
+        Args:
+            problems: List of schema problems to log.
+            logger_name: Name of the logger that failed to initialize.
+        """
+        # Format error message with details of all problems
+        # (same format as data problems)
+        problem_messages = [problem.message for problem in problems]
+        error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
+        sys.stderr.write(error_msg)
+        sys.stderr.flush()
+        os._exit(1)
 
     def _log(
         self,

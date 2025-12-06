@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.errors import SchemaValidationError
 from tests.conftest import _write_schema
 
 
@@ -94,8 +93,8 @@ def test_concurrent_schema_compilation(
             )
 
             compiled, problems = compile_schema_internal()
-            if problems:
-                raise SchemaValidationError("Schema has problems", problems=problems)
+            # Schema should compile successfully (no problems)
+            assert not problems, f"Schema has problems: {problems}"
             with lock:
                 compiled_schemas.append(compiled)
         except Exception as e:
