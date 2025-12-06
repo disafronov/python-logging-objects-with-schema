@@ -267,7 +267,8 @@ message similar to:
 
 > Field 'tags' is a list but contains elements with types [...]; expected all elements to be of type str
 
-and an ERROR message is logged **after** the log record has been emitted.
+and an ERROR message is logged **after** the log record has been emitted with
+the format: `"Log data does not match schema: {problem1}; {problem2}; ..."`.
 
 ### Multiple leaves with the same source
 
@@ -386,7 +387,8 @@ terminated after logging the error to stderr.
 
 In all of these cases a `DataProblem` is recorded for each offending field, and
 if at least one problem is present, a single ERROR message is logged
-**after** the log record has been emitted.
+**after** the log record has been emitted. The error message format is:
+`"Log data does not match schema: {problem1}; {problem2}; ..."`.
 
 - When a `source` is used in multiple leaves (see "Multiple leaves with the same
   source" above), the value is validated and written independently for each leaf
@@ -402,8 +404,9 @@ High-level algorithm inside `SchemaLogger`:
   2. A new structured payload is built from the schema and the given `extra`.
   3. Only this structured payload is passed to the underlying stdlib logger.
   4. After logging, if any validation problems were detected, a single
-     ERROR message is logged with the full `problems` list (no exception
-     is raised, ensuring 100% compatibility with standard logger behavior).
+     ERROR message is logged with the format:
+     `"Log data does not match schema: {problem1}; {problem2}; ..."`
+     (no exception is raised, ensuring 100% compatibility with standard logger behavior).
 
 ## Error handling
 
