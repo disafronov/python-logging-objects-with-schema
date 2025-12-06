@@ -11,10 +11,10 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
+from conftest import _write_schema
 
 from logging_objects_with_schema import SchemaLogger
 from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
-from tests.conftest import _write_schema
 
 
 def test_multiple_logger_instances_share_schema(
