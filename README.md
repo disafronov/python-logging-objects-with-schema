@@ -132,25 +132,13 @@ logger.info(
 ### Error handling example
 
 ```python
-from logging_objects_with_schema import SchemaLogger, SchemaValidationError
+from logging_objects_with_schema import SchemaLogger
 
-try:
-    # This will raise SchemaValidationError if schema file is missing or invalid
-    logging.setLoggerClass(SchemaLogger)
-    logger = logging.getLogger("service")
-except SchemaValidationError as e:
-    print(f"Schema validation failed: {e}")
-    for problem in e.problems:
-        print(f"  - {problem.message}")
-    # Decide whether to abort or continue with default logger
-    raise
-except (OSError, ValueError, RuntimeError) as e:
-    # System-level errors (e.g., inaccessible working directory when os.getcwd()
-    # fails, lock failures, path resolution issues) are raised directly, not
-    # wrapped in SchemaValidationError. Note: OSError when reading the schema
-    # file is converted to SchemaValidationError and handled above.
-    print(f"System error during logger initialization: {e}")
-    raise
+# SchemaLogger is a drop-in replacement - no exception handling needed.
+# If the schema has problems, the application will be terminated after
+# logging schema problems to stderr.
+logging.setLoggerClass(SchemaLogger)
+logger = logging.getLogger("service")
 
 # When logging with invalid data, validation errors are automatically
 # logged as ERROR messages. No exception handling is needed.
@@ -178,12 +166,11 @@ logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
 - Schema tree depth is limited to a maximum nesting level (currently 100). Any
   branch that exceeds this depth is ignored and reported as a schema problem.
 
-  If the schema file is not found, or cannot be read/parsed/validated, a
-  `SchemaValidationError("Schema has problems", problems=[...])` is raised when
-  a `SchemaLogger` instance is created. In this case the logger instance is not
-  created at all. The `problems` list contains a detailed description of the
-  issue, including the path where the file was expected (based on the current
-  working directory at schema discovery time).
+  If the schema file is not found, or cannot be read/parsed/validated, the
+  logger instance is not created, schema problems are logged to stderr, and
+  the application is terminated via `os._exit(1)`. The error message contains
+  a detailed description of all issues, including the path where the file was
+  expected (based on the current working directory at schema discovery time).
 
 An example schema:
 
@@ -317,30 +304,19 @@ consistent type expectations when reusing a `source` field.
 - If there are **any** problems with the schema (missing file, broken JSON,
   invalid `type` values, conflicting root fields that match system logging
   fields, malformed structure, etc.):
-  - a `SchemaValidationError("Schema has problems", problems=[...])` is raised;
-  - the logger instance is not created.
+  - the logger instance is not created;
+  - schema problems are logged to stderr in the format:
+    `"Schema has problems: {problem1}; {problem2}; ..."`;
+  - the application is terminated via `os._exit(1)`.
 - If there are no problems:
   - the schema is compiled into a `CompiledSchema`;
   - the logger is created and starts using this schema to validate `extra`
     fields.
 
-The application decides whether `SchemaValidationError` is a fatal error that
-should abort startup, or whether it should be logged and ignored.
-
-**Note**: In rare cases, system-level errors may be raised directly instead of
-being wrapped in `SchemaValidationError`. Specifically:
-
-- `OSError` when the current working directory is inaccessible or deleted (e.g.,
-  when `os.getcwd()` fails) is propagated as-is to indicate environmental issues.
-  However, `OSError` that occurs when reading the schema file (e.g., permission
-  denied, I/O errors) is converted to `SchemaValidationError` and reported as a
-  schema problem.
-- `ValueError` when path resolution fails due to invalid characters or malformed
-  paths during schema file discovery is propagated as-is.
-- `RuntimeError` when thread lock acquisition fails is propagated as-is.
-
-Applications should handle these exceptions separately if they need to
-distinguish between schema validation failures and system-level errors.
+**Note**: System-level errors (OSError, ValueError, RuntimeError) that occur
+during schema compilation are converted to `SchemaProblem` instances and
+handled the same way as schema validation problems - the application is
+terminated after logging the error to stderr.
 
 ## Schema caching and thread safety
 
@@ -412,9 +388,9 @@ High-level algorithm inside `SchemaLogger`:
      ERROR message is logged with the full `problems` list (no exception
      is raised, ensuring 100% compatibility with standard logger behavior).
 
-## Exceptions
+## Error handling
 
-- **`SchemaValidationError`**:
-  - Any problem with the schema (missing file, broken JSON, invalid types,
-    conflicting root fields, malformed structure, etc.).
-  - Exposes a `problems` list describing each violation.
+- Schema problems are handled internally: errors are logged to stderr and
+  the application is terminated via `os._exit(1)`.
+- No exceptions are raised by `SchemaLogger` during initialization, making
+  it a true drop-in replacement for `logging.Logger`.
