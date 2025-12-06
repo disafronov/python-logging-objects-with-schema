@@ -168,6 +168,30 @@ def test_schema_logger_terminates_on_bad_schema(
     assert "Schema has problems" in stderr_output.getvalue()
 
 
+def test_schema_logger_creates_successfully_with_valid_empty_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SchemaLogger should create successfully with a valid empty schema.
+
+    A valid empty schema (e.g., {}) should not cause errors or terminate
+    the application. The logger should be created successfully.
+    """
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(tmp_path, {})
+
+    # Creating logger with empty schema should not raise exceptions or terminate
+    logger = SchemaLogger("test-logger")
+
+    assert isinstance(logger, logging.Logger)
+    assert logger.name == "test-logger"
+    # Verify that the logger has the _schema attribute set
+    assert hasattr(logger, "_schema")
+    # Verify that the schema is empty (no leaves)
+    assert logger._schema.is_empty
+
+
 def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
