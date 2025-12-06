@@ -80,7 +80,7 @@ class SchemaLogger(logging.Logger):
             # cache before logging and terminating, to prevent broken logger
             # instances from being cached and reused.
             self._cleanup_failed_logger()
-            self._log_schema_problems_and_exit(problems, name)
+            self._log_schema_problems_and_exit(problems)
 
         self._schema: CompiledSchema = compiled
 
@@ -92,14 +92,11 @@ class SchemaLogger(logging.Logger):
         """
         self.manager.loggerDict.pop(self.name, None)
 
-    def _log_schema_problems_and_exit(
-        self, problems: list[SchemaProblem], logger_name: str
-    ) -> None:
+    def _log_schema_problems_and_exit(self, problems: list[SchemaProblem]) -> None:
         """Log schema problems to stderr and terminate the application.
 
         Args:
             problems: List of schema problems to log.
-            logger_name: Name of the logger that failed to initialize.
         """
         # Format error message with details of all problems
         # (same format as data problems)
