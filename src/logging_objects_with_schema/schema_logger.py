@@ -20,6 +20,11 @@ from .errors import SchemaProblem
 from .schema_applier import _apply_schema_internal
 from .schema_loader import CompiledSchema, _compile_schema_internal
 
+# Python 3.11+ has improved findCaller() implementation with proper stacklevel support.
+# For Python < 3.11, we use inspect.stack() as a fallback due to known issues with
+# findCaller() and stacklevel parameter.
+_USE_FINDCALLER = sys.version_info >= (3, 11)
+
 
 def _log_schema_problems_and_exit(problems: list[SchemaProblem]) -> None:
     """Log schema problems to stderr and terminate the application.
@@ -146,30 +151,40 @@ class SchemaLogger(logging.Logger):
 
         if data_problems:
             # Log validation errors as ERROR messages
-            # Get caller information using inspect.stack() to ensure consistent behavior
-            # across all Python versions. Python 3.10 had issues with findCaller() and
-            # stacklevel parameter, so we use inspect.stack() as the primary method
-            # with findCaller() as a fallback for compatibility. The stack looks like:
-            # - Frame 0: this function (_log)
-            # - Frame 1: logger.info() wrapper
-            # - Frame 2: actual caller (test_function)
-            # We need to skip frame 0 (this function) and frame 1 (logger.info wrapper),
-            # so we use stacklevel + 1 to get to the actual caller.
-            stack = inspect.stack()
-            frame_idx = (
-                stacklevel + 1
-            )  # Skip this function (0) + logger.info wrapper (1)
-            if frame_idx < len(stack):
-                frame = stack[frame_idx]
-                fn = frame.filename
-                lno = frame.lineno
-                func = frame.function
-                sinfo = None
-            else:
-                # Fallback to findCaller if stack is shorter than expected
+            # Get caller information for the error log record.
+            # Python 3.11+ has improved findCaller() with proper stacklevel support,
+            # so we use it as the primary method for better performance.
+            # For Python < 3.11, we fall back to inspect.stack() due to known issues
+            # with findCaller() and stacklevel parameter.
+            if _USE_FINDCALLER:
+                # Use findCaller() for Python 3.11+ (more efficient)
                 fn, lno, func, sinfo = self.findCaller(
                     stack_info=False, stacklevel=stacklevel + 1
                 )
+            else:
+                # Fallback to inspect.stack() for Python < 3.11
+                # The stack looks like:
+                # - Frame 0: this function (_log)
+                # - Frame 1: logger.info() wrapper
+                # - Frame 2: actual caller (test_function)
+                # We need to skip frame 0 (this function) and frame 1
+                # (logger.info wrapper), so we use stacklevel + 1 to get to
+                # the actual caller.
+                stack = inspect.stack()
+                frame_idx = (
+                    stacklevel + 1
+                )  # Skip this function (0) + logger.info wrapper (1)
+                if frame_idx < len(stack):
+                    frame = stack[frame_idx]
+                    fn = frame.filename
+                    lno = frame.lineno
+                    func = frame.function
+                    sinfo = None
+                else:
+                    # Fallback to findCaller if stack is shorter than expected
+                    fn, lno, func, sinfo = self.findCaller(
+                        stack_info=False, stacklevel=stacklevel + 1
+                    )
             # Format error message with details of all problems
             problem_messages = [problem.message for problem in data_problems]
             error_msg = f"Log data does not match schema: {'; '.join(problem_messages)}"
@@ -181,9 +196,9 @@ class SchemaLogger(logging.Logger):
                 error_msg,
                 (),
                 None,  # exc_info - not needed
-                func,  # func - function name from findCaller
+                func,  # func - function name from caller
                 None,  # extra - not needed
-                sinfo,  # sinfo - stack info from findCaller
+                sinfo,  # sinfo - stack info from caller
             )
             try:
                 self.callHandlers(error_record)
