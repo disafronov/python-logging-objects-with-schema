@@ -445,7 +445,8 @@ def _compile_schema_tree(
     Yields:
         SchemaLeaf objects found in the tree.
     """
-    # Check for excessive nesting depth
+    # Check for excessive nesting depth (DoS protection: prevent deeply nested
+    # schemas that could cause stack overflow or excessive memory usage)
     if len(path) > MAX_SCHEMA_DEPTH:
         problems.append(
             SchemaProblem(
