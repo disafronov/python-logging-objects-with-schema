@@ -42,25 +42,24 @@ jobs:
 
           # Fetch latest state after semantic-release pushed commits
           # This ensures we get all commits that semantic-release created
-          git fetch origin release:release
-          git fetch origin main:main
+          git fetch origin
 
-          # Check if main is already up to date
-          if git diff --quiet main release; then
+          # Check if main is already up to date with release
+          if git diff --quiet origin/main origin/release; then
             echo "main is already up to date with release"
             exit 0
           fi
 
           # Check if main is ancestor of release (can fast-forward)
-          if git merge-base --is-ancestor main release; then
+          if git merge-base --is-ancestor origin/main origin/release; then
             echo "Fast-forwarding main to release"
-            git checkout main
-            git merge --ff-only release
+            git checkout -B main origin/main
+            git merge --ff-only origin/release
             git push origin main
           else
             echo "Rebasing main onto release (force-with-lease required)"
-            git checkout main
-            git rebase release
+            git checkout -B main origin/main
+            git rebase origin/release
             # Use --force-with-lease for safety: only push if remote hasn't changed
             git push --force-with-lease origin main
           fi
