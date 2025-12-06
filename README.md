@@ -191,6 +191,16 @@ An example schema:
 }
 ```
 
+An example of a valid empty schema (no leaves, no problems):
+
+```json
+{}
+```
+
+An empty schema is valid and does not cause errors. When using an empty schema,
+no `extra` fields will be included in log records, and any attempt to log with
+`extra` fields will result in validation errors being logged as ERROR messages.
+
 - An inner node is an object without `type` and `source`.
 - A leaf node is an object with both `type` and `source`.
 - `type` is one of the allowed Python type names: `"str"`, `"int"`, `"float"`,
@@ -304,7 +314,8 @@ consistent type expectations when reusing a `source` field.
 - If there are **any** problems with the schema (missing file, broken JSON,
   invalid `type` values, conflicting root fields that match system logging
   fields, malformed structure, etc.):
-  - the logger instance is not created;
+  - the partially initialized logger instance is removed from the logging
+    manager cache to prevent broken instances from being reused;
   - schema problems are logged to stderr in the format:
     `"Schema has problems: {problem1}; {problem2}; ..."`;
   - the application is terminated via `os._exit(1)`.
@@ -312,6 +323,9 @@ consistent type expectations when reusing a `source` field.
   - the schema is compiled into a `CompiledSchema`;
   - the logger is created and starts using this schema to validate `extra`
     fields.
+  - A valid empty schema (e.g., `{}` or a schema with only inner nodes and no
+    leaves) is treated as valid and does not cause errors. The logger is created
+    successfully, but no `extra` fields will be included in log records.
 
 **Note**: System-level errors (OSError, ValueError, RuntimeError) that occur
 during schema compilation are converted to `SchemaProblem` instances and

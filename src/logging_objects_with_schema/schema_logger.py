@@ -54,6 +54,10 @@ class SchemaLogger(logging.Logger):
             level: Logger level (same as :class:`logging.Logger`).
         """
         super().__init__(name, level)
+        # Note: The logger instance is created before checking for schema problems
+        # intentionally. This allows us to properly clean up the instance from the
+        # logging manager cache if schema validation fails, preventing broken logger
+        # instances from being cached and reused.
 
         try:
             compiled, problems = _compile_schema_internal()
