@@ -314,8 +314,8 @@ consistent type expectations when reusing a `source` field.
 - If there are **any** problems with the schema (missing file, broken JSON,
   invalid `type` values, conflicting root fields that match system logging
   fields, malformed structure, etc.):
-  - the partially initialized logger instance is removed from the logging
-    manager cache to prevent broken instances from being reused;
+  - the logger instance is not created (schema validation happens before
+    the logger is initialized);
   - schema problems are logged to stderr in the format:
     `"Schema has problems: {problem1}; {problem2}; ..."`;
   - the application is terminated via `os._exit(1)`.

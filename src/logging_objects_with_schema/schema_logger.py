@@ -21,6 +21,21 @@ from .schema_applier import _apply_schema_internal
 from .schema_loader import CompiledSchema, _compile_schema_internal
 
 
+def _log_schema_problems_and_exit(problems: list[SchemaProblem]) -> None:
+    """Log schema problems to stderr and terminate the application.
+
+    Args:
+        problems: List of schema problems to log.
+    """
+    # Format error message with details of all problems
+    # (same format as data problems)
+    problem_messages = [problem.message for problem in problems]
+    error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
+    sys.stderr.write(error_msg)
+    sys.stderr.flush()
+    os._exit(1)
+
+
 class SchemaLogger(logging.Logger):
     """Logger subclass that enforces schema on extra fields.
 
@@ -53,12 +68,9 @@ class SchemaLogger(logging.Logger):
             name: Logger name (same as :class:`logging.Logger`).
             level: Logger level (same as :class:`logging.Logger`).
         """
-        super().__init__(name, level)
-        # Note: The logger instance is created before checking for schema problems
-        # intentionally. This allows us to properly clean up the instance from the
-        # logging manager cache if schema validation fails, preventing broken logger
-        # instances from being cached and reused.
-
+        # Validate schema before creating the logger instance to avoid
+        # registering a broken logger in the logging manager cache.
+        # Schema is compiled and cached first, then problems are checked.
         try:
             compiled, problems = _compile_schema_internal()
         except (OSError, ValueError, RuntimeError) as exc:
@@ -80,35 +92,13 @@ class SchemaLogger(logging.Logger):
             compiled = CompiledSchema(leaves=[])
 
         if problems:
-            # Schema is invalid; remove this instance from the logging manager
-            # cache before logging and terminating, to prevent broken logger
-            # instances from being cached and reused.
-            self._cleanup_failed_logger()
-            self._log_schema_problems_and_exit(problems)
+            # Schema is invalid; log problems and terminate without creating
+            # the logger instance.
+            _log_schema_problems_and_exit(problems)
 
+        # Schema is valid; create the logger instance.
+        super().__init__(name, level)
         self._schema: CompiledSchema = compiled
-
-    def _cleanup_failed_logger(self) -> None:
-        """Remove this logger instance from the logging manager.
-
-        Called when schema compilation fails to prevent broken logger
-        instances from being cached and reused.
-        """
-        self.manager.loggerDict.pop(self.name, None)
-
-    def _log_schema_problems_and_exit(self, problems: list[SchemaProblem]) -> None:
-        """Log schema problems to stderr and terminate the application.
-
-        Args:
-            problems: List of schema problems to log.
-        """
-        # Format error message with details of all problems
-        # (same format as data problems)
-        problem_messages = [problem.message for problem in problems]
-        error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
-        sys.stderr.write(error_msg)
-        sys.stderr.flush()
-        os._exit(1)
 
     def _log(
         self,
