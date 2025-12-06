@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.errors import DataValidationError
 from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
 
 
@@ -56,11 +55,15 @@ def test_schema_logger_type_mismatch_logs_error_after_logging(
     logger.info("msg", extra={"user_id": "not-an-int"})
 
     output = stream.getvalue()
-    # No user_id should be present because it failed validation.
-    assert "user_id" not in output
+    # user_id should not appear in the main log message (it failed validation)
+    # but it should appear in the validation error message
+    main_log = output.split("ERROR:")[0]
+    assert "user_id" not in main_log
     # Validation error should be logged as ERROR
     assert "ERROR" in output
     assert "Log data does not match schema" in output
+    # Details of the problem should be included in the error message
+    assert "user_id" in output
 
 
 def test_schema_logger_valid_data_appears_in_log(
@@ -103,11 +106,11 @@ def test_schema_logger_valid_data_appears_in_log(
     assert "42" in output
 
 
-def test_validation_error_record_has_function_name_and_traceback(
+def test_validation_error_record_has_function_name(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Validation error log records should have function name and traceback."""
+    """Validation error log records should have function name."""
 
     monkeypatch.chdir(tmp_path)
 
@@ -159,11 +162,5 @@ def test_validation_error_record_has_function_name_and_traceback(
     assert error_record.funcName is not None
     assert error_record.funcName == "test_function"
 
-    # Verify that exc_info is set correctly with full traceback
-    # - this is the fix we made
-    assert error_record.exc_info is not None
-    exc_type, exc_value, exc_traceback = error_record.exc_info
-    assert exc_type == DataValidationError
-    assert isinstance(exc_value, DataValidationError)
-    # Traceback should be present since we temporarily raise the exception to get it
-    assert exc_traceback is not None
+    # Verify that exc_info is not set (we don't need traceback for validation errors)
+    assert error_record.exc_info is None

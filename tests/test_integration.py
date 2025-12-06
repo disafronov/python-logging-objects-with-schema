@@ -296,14 +296,18 @@ def test_logger_with_empty_schema(
     # Message should be logged
     output = stream.getvalue()
     assert "message" in output
-    assert "unknown_field" not in output
-    assert "another" not in output
+    # Fields should not appear in the main log message (they failed validation)
+    # but they should appear in the validation error message
+    main_log = output.split("ERROR:")[0]
+    assert "unknown_field" not in main_log
+    assert "another" not in main_log
 
     # Validation error should be logged as ERROR
     assert "ERROR" in output
     assert "Log data does not match schema" in output
-    # Traceback should be present in the output
-    assert "Traceback" in output
+    # Details of problems should be included in the error message
+    assert "unknown_field" in output
+    assert "another" in output
 
 
 def test_schema_file_permission_error_raises_schema_validation_error(

@@ -132,7 +132,7 @@ logger.info(
 ### Error handling example
 
 ```python
-from logging_objects_with_schema import SchemaLogger, DataValidationError, SchemaValidationError
+from logging_objects_with_schema import SchemaLogger, SchemaValidationError
 
 try:
     # This will raise SchemaValidationError if schema file is missing or invalid
@@ -156,7 +156,7 @@ except (OSError, ValueError, RuntimeError) as e:
 # logged as ERROR messages. No exception handling is needed.
 logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
 # The valid part of the log is emitted, and validation errors are logged
-# as ERROR messages with full exception information.
+# as ERROR messages with details about the problems.
 ```
 
 ### API compatibility with ``logging.Logger``
@@ -418,14 +418,3 @@ High-level algorithm inside `SchemaLogger`:
   - Any problem with the schema (missing file, broken JSON, invalid types,
     conflicting root fields, malformed structure, etc.).
   - Exposes a `problems` list describing each violation.
-- **`DataValidationError`**:
-  - Exception type used internally to represent validation problems with a
-    specific `extra` payload during logging:
-    - the runtime type does not match the expected type;
-    - a list contains non-primitive elements (only str, int, float, bool allowed);
-    - the field is redundant and not described in the schema.
-  - Logged as ERROR **after** the valid part of the payload has been logged.
-  - Contains a `problems` list describing the offending fields.
-  - **Note**: This exception is never raised during normal operation. It is
-    created and logged automatically to maintain 100% compatibility with
-    standard logger behavior. Applications do not need to catch it.
