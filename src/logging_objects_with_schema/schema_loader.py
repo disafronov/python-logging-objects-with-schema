@@ -152,7 +152,7 @@ def _check_cached_found_file_path() -> Path | None:
     if _resolved_schema_path.exists():
         return _resolved_schema_path
 
-    # If cached path doesn't exist, re-search (schema might have been moved)
+    # Cached file no longer exists; invalidate cache so caller will re-search
     _resolved_schema_path = None
     return None
 
