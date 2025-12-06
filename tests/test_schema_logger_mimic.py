@@ -7,9 +7,9 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
+from conftest import _write_schema
 
 from logging_objects_with_schema import SchemaLogger
-from tests.conftest import _write_schema
 
 
 def test_schema_logger_is_logging_logger_instance(
