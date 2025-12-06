@@ -34,8 +34,7 @@ def _validate_list_value(
     """
     if item_expected_type is None:
         return DataProblem(
-            f"Field '{source}' is declared as list in schema but "
-            f"has no item type configured",
+            f"Field '{source}' is list but has no item type configured",
         )
 
     if len(value) == 0:
@@ -227,7 +226,7 @@ def _apply_schema_internal(
         if value is None:
             problems.append(
                 DataProblem(
-                    f"Field '{source}' is None, but None values are not allowed",
+                    f"Field '{source}' is None",
                 ),
             )
             continue
@@ -246,7 +245,7 @@ def _apply_schema_internal(
     for key in redundant_keys:
         problems.append(
             DataProblem(
-                f"Field '{key}' is not defined in schema and will be ignored",
+                f"Field '{key}' is not defined in schema",
             ),
         )
 
