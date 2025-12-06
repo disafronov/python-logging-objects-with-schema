@@ -12,6 +12,9 @@ on:
 jobs:
   force-release-pr:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     if: github.event.pull_request.head.ref == 'main'
 
     steps:
