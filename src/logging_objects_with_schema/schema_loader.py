@@ -13,9 +13,10 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, MutableMapping
+from typing import Any
 
 from .errors import SchemaProblem
 
