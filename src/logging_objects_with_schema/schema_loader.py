@@ -559,10 +559,9 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
     to the schema, the application must restart the process. See the README
     section \"Schema caching and thread safety\" for more details.
 
-    This function never raises ``SchemaValidationError``. It always returns
-    the best-effort compiled schema together with a list of problems detected
-    during processing (an empty ``CompiledSchema`` when the schema is missing
-    or invalid).
+    This function never raises exceptions. It always returns the best-effort
+    compiled schema together with a list of problems detected during processing
+    (an empty ``CompiledSchema`` when the schema is missing or invalid).
 
     Note:
         This function is used internally by :class:`SchemaLogger` and by the
