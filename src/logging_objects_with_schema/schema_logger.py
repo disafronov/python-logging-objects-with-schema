@@ -142,12 +142,8 @@ class SchemaLogger(logging.Logger):
                 stack_info=False, stacklevel=stacklevel + 1
             )
             # Format error message with details of all problems
-            error_msg = "Log data does not match schema"
-            if data_problems:
-                problem_messages = [
-                    f"  - {problem.message}" for problem in data_problems
-                ]
-                error_msg = f"{error_msg}\n" + "\n".join(problem_messages)
+            problem_messages = [problem.message for problem in data_problems]
+            error_msg = f"Log data does not match schema: {'; '.join(problem_messages)}"
             error_record = self.makeRecord(
                 self.name,
                 logging.ERROR,
