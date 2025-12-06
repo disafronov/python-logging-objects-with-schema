@@ -5,6 +5,7 @@ name: Lint and test
   pull_request:
     branches:
       - main
+      - release
 
 jobs:
   lint_and_test:
