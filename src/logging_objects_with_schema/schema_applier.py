@@ -195,8 +195,8 @@ def _apply_schema_internal(
       where the type matches; mismatched locations produce ``DataProblem``
       entries, but do not affect successful locations.
 
-    The function itself does not raise ``DataValidationError``; it only
-    accumulates :class:`DataProblem` instances for the caller to handle.
+    The function itself does not raise exceptions; it only accumulates
+    :class:`DataProblem` instances for the caller to handle.
 
     Note:
         This function is used internally by :class:`SchemaLogger` and is not
