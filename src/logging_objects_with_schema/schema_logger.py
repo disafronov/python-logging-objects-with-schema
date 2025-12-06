@@ -53,8 +53,11 @@ class SchemaLogger(logging.Logger):
             compiled, problems = _compile_schema_internal()
         except (OSError, ValueError, RuntimeError):
             # Catch specific exceptions that can occur during schema compilation:
-            # - OSError: file system issues (e.g., os.getcwd() failures,
-            #   permission errors)
+            # - OSError: system-level file system issues (e.g., os.getcwd() failures
+            #   when the current working directory is inaccessible or deleted).
+            #   Note: OSError that occurs when reading the schema file (e.g., permission
+            #   denied, I/O errors) is converted to SchemaValidationError in
+            #   _load_raw_schema() and does not reach this exception handler.
             # - ValueError: path resolution issues (e.g., invalid path characters,
             #   malformed paths during schema file discovery)
             # - RuntimeError: threading issues (e.g., lock acquisition problems)
