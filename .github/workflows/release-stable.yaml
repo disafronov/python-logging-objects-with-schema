@@ -33,3 +33,36 @@ jobs:
             -e GITHUB_TOKEN=${{ secrets.SEMANTIC_RELEASE_TOKEN || secrets.GITHUB_TOKEN }} \
             -e CI=true \
             ghcr.io/disafronov/semantic-release:latest
+
+      - name: Sync release to main
+        if: success()
+        run: |
+          git config user.name "Release Bot"
+          git config user.email "noreply@github.com"
+
+          # Fetch latest state after semantic-release pushed commits
+          # This ensures we get all commits that semantic-release created
+          git fetch origin release:release
+          git fetch origin main:main
+
+          # Check if main is already up to date
+          if git diff --quiet main release; then
+            echo "main is already up to date with release"
+            exit 0
+          fi
+
+          # Check if main is ancestor of release (can fast-forward)
+          if git merge-base --is-ancestor main release; then
+            echo "Fast-forwarding main to release"
+            git checkout main
+            git merge --ff-only release
+            git push origin main
+          else
+            echo "Rebasing main onto release (force-with-lease required)"
+            git checkout main
+            git rebase release
+            # Use --force-with-lease for safety: only push if remote hasn't changed
+            git push --force-with-lease origin main
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
