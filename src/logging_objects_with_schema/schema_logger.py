@@ -1,14 +1,16 @@
 """Logger subclass that applies a JSON schema to extra fields.
 
 This class extends the standard ``logging.Logger`` to validate and filter
-user-provided ``extra`` fields according to a compiled JSON schema. It raises
-a DataValidationError *after* the log record has been emitted when problems
-are detected.
+user-provided ``extra`` fields according to a compiled JSON schema. When
+validation problems are detected, they are logged as ERROR messages *after*
+the log record has been emitted, ensuring 100% compatibility with standard
+logger behavior.
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Mapping
 from typing import Any
 
@@ -101,7 +103,10 @@ class SchemaLogger(logging.Logger):
         """Log a message with the specified level and schema-validated extra.
 
         This method validates and filters the ``extra`` parameter according
-        to the compiled schema before delegating to the parent class.
+        to the compiled schema before delegating to the parent class. If
+        validation problems are detected, they are logged as ERROR messages
+        after the main log record has been emitted, ensuring compatibility
+        with standard logger behavior (no exceptions are raised).
 
         Args:
             level: Logging level.
@@ -111,9 +116,6 @@ class SchemaLogger(logging.Logger):
             extra: Extra fields to include in the log record.
             stack_info: Whether to include stack information.
             stacklevel: Stack level for caller information.
-
-        Raises:
-            DataValidationError: If the ``extra`` data does not match the schema.
         """
         structured_extra, data_problems = _apply_schema_internal(
             self._schema,
@@ -133,7 +135,48 @@ class SchemaLogger(logging.Logger):
         )
 
         if data_problems:
-            raise DataValidationError(
+            # Log validation errors as ERROR messages with full traceback
+            # by temporarily raising and catching the exception.
+            validation_error = DataValidationError(
                 "Log data does not match schema",
                 problems=data_problems,
             )
+
+            # Temporarily raise exception to get traceback, then catch it
+            try:
+                raise validation_error
+            except DataValidationError:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                # exc_type and exc_value are guaranteed to be not None here
+                # since we just caught the exception
+                assert exc_type is not None
+                assert exc_value is not None
+
+                # Use stacklevel + 1 to account for this override frame, same as
+                # in the main logging call above, so caller info points to user code.
+                fn, lno, func, sinfo = self.findCaller(
+                    stack_info=False, stacklevel=stacklevel + 1
+                )
+                error_record = self.makeRecord(
+                    self.name,
+                    logging.ERROR,
+                    fn,
+                    lno,
+                    str(validation_error),
+                    (),
+                    (
+                        exc_type,
+                        exc_value,
+                        exc_traceback,
+                    ),  # exc_info with full traceback
+                    func,  # func - function name from findCaller
+                    None,  # extra - not needed
+                    sinfo,  # sinfo - stack info from findCaller
+                )
+                try:
+                    self.callHandlers(error_record)
+                except Exception:
+                    # If handler failed, log error to stderr (standard logging behavior)
+                    sys.stderr.write(f"Error in logging handler: {error_record}\n")
+
+                # Don't re-raise to maintain compatibility with standard logger

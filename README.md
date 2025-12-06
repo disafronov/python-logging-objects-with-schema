@@ -24,7 +24,7 @@ to appear in logs and which types they must have.
 
 - Application code must only send `extra` fields that are described in the schema
   and match the declared Python types. Any deviation (unknown fields, wrong types,
-  `None` values, disallowed list elements) is reported via `DataValidationError`
+  `None` values, disallowed list elements) is logged as an ERROR message
   *after* the log record has been emitted.
 - The schema file (`logging_objects_with_schema.json`) is a shared, versioned
   artifact that defines the shape of structured log payloads for all downstream
@@ -39,9 +39,9 @@ to appear in logs and which types they must have.
 - Any mismatch between runtime values and the declared types is also treated as
   a data error.
 - All validation problems (unknown fields, wrong types, disallowed list
-  elements, `None` values, etc.) are aggregated into a single
-  `DataValidationError` that is raised **after** the log record has been
-  emitted.
+  elements, `None` values, etc.) are aggregated and logged as a single
+  ERROR message **after** the log record has been emitted, ensuring 100%
+  compatibility with standard logger behavior (no exceptions are raised).
 - The schema is treated as the only source of truth for which `extra` fields
   are allowed to appear in logs. Any deviation from the schema is considered a
   contract violation between the producer of `extra` and the schema author.
@@ -152,14 +152,11 @@ except (OSError, ValueError, RuntimeError) as e:
     print(f"System error during logger initialization: {e}")
     raise
 
-# When logging, handle DataValidationError
-try:
-    logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
-except DataValidationError as e:
-    print(f"Data validation failed: {e}")
-    for problem in e.problems:
-        print(f"  - {problem.message}")
-    # Note: the valid part of the log was already emitted before the exception
+# When logging with invalid data, validation errors are automatically
+# logged as ERROR messages. No exception handling is needed.
+logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
+# The valid part of the log is emitted, and validation errors are logged
+# as ERROR messages with full exception information.
 ```
 
 ### API compatibility with ``logging.Logger``
@@ -270,7 +267,7 @@ message similar to:
 
 > Field 'tags' is a list but contains elements with types [...]; expected all elements to be of type str
 
-and a `DataValidationError` is raised **after** the log record has been emitted.
+and an ERROR message is logged **after** the log record has been emitted.
 
 ### Multiple leaves with the same source
 
@@ -284,7 +281,7 @@ When a `source` is referenced by multiple leaves:
 - The value is written only to those leaf locations where the runtime type
   matches the expected type.
 - For leaf locations where the type does not match, a `DataProblem` is added
-  to the `DataValidationError` that is raised after logging.
+  to the ERROR message that is logged after logging.
 
 Example schema with duplicate source usage:
 
@@ -395,7 +392,7 @@ distinguish between schema validation failures and system-level errors.
   **it is simply not included in the final log record**.
 
 In all of these cases a `DataProblem` is recorded for each offending field, and
-if at least one problem is present a single `DataValidationError` is raised
+if at least one problem is present, a single ERROR message is logged
 **after** the log record has been emitted.
 
 - When a `source` is used in multiple leaves (see "Multiple leaves with the same
@@ -412,7 +409,8 @@ High-level algorithm inside `SchemaLogger`:
   2. A new structured payload is built from the schema and the given `extra`.
   3. Only this structured payload is passed to the underlying stdlib logger.
   4. After logging, if any validation problems were detected, a single
-     `DataValidationError` is raised with the full `problems` list.
+     ERROR message is logged with the full `problems` list (no exception
+     is raised, ensuring 100% compatibility with standard logger behavior).
 
 ## Exceptions
 
@@ -421,9 +419,13 @@ High-level algorithm inside `SchemaLogger`:
     conflicting root fields, malformed structure, etc.).
   - Exposes a `problems` list describing each violation.
 - **`DataValidationError`**:
-  - Any problem with a specific `extra` payload during logging:
+  - Exception type used internally to represent validation problems with a
+    specific `extra` payload during logging:
     - the runtime type does not match the expected type;
     - a list contains non-primitive elements (only str, int, float, bool allowed);
     - the field is redundant and not described in the schema.
-  - Raised **after** the valid part of the payload has been logged.
+  - Logged as ERROR **after** the valid part of the payload has been logged.
   - Contains a `problems` list describing the offending fields.
+  - **Note**: This exception is never raised during normal operation. It is
+    created and logged automatically to maintain 100% compatibility with
+    standard logger behavior. Applications do not need to catch it.
