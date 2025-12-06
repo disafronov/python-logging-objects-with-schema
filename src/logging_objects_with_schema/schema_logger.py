@@ -14,7 +14,7 @@ import sys
 from collections.abc import Mapping
 from typing import Any
 
-from .errors import DataValidationError, SchemaValidationError
+from .errors import SchemaValidationError
 from .schema_applier import _apply_schema_internal
 from .schema_loader import CompiledSchema, _compile_schema_internal
 
@@ -135,48 +135,33 @@ class SchemaLogger(logging.Logger):
         )
 
         if data_problems:
-            # Log validation errors as ERROR messages with full traceback
-            # by temporarily raising and catching the exception.
-            validation_error = DataValidationError(
-                "Log data does not match schema",
-                problems=data_problems,
+            # Log validation errors as ERROR messages
+            # Use stacklevel + 1 to account for this override frame, same as
+            # in the main logging call above, so caller info points to user code.
+            fn, lno, func, sinfo = self.findCaller(
+                stack_info=False, stacklevel=stacklevel + 1
             )
-
-            # Temporarily raise exception to get traceback, then catch it
+            # Format error message with details of all problems
+            error_msg = "Log data does not match schema"
+            if data_problems:
+                problem_messages = [
+                    f"  - {problem.message}" for problem in data_problems
+                ]
+                error_msg = f"{error_msg}\n" + "\n".join(problem_messages)
+            error_record = self.makeRecord(
+                self.name,
+                logging.ERROR,
+                fn,
+                lno,
+                error_msg,
+                (),
+                None,  # exc_info - not needed
+                func,  # func - function name from findCaller
+                None,  # extra - not needed
+                sinfo,  # sinfo - stack info from findCaller
+            )
             try:
-                raise validation_error
-            except DataValidationError:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                # exc_type and exc_value are guaranteed to be not None here
-                # since we just caught the exception
-                assert exc_type is not None
-                assert exc_value is not None
-
-                # Use stacklevel + 1 to account for this override frame, same as
-                # in the main logging call above, so caller info points to user code.
-                fn, lno, func, sinfo = self.findCaller(
-                    stack_info=False, stacklevel=stacklevel + 1
-                )
-                error_record = self.makeRecord(
-                    self.name,
-                    logging.ERROR,
-                    fn,
-                    lno,
-                    str(validation_error),
-                    (),
-                    (
-                        exc_type,
-                        exc_value,
-                        exc_traceback,
-                    ),  # exc_info with full traceback
-                    func,  # func - function name from findCaller
-                    None,  # extra - not needed
-                    sinfo,  # sinfo - stack info from findCaller
-                )
-                try:
-                    self.callHandlers(error_record)
-                except Exception:
-                    # If handler failed, log error to stderr (standard logging behavior)
-                    sys.stderr.write(f"Error in logging handler: {error_record}\n")
-
-                # Don't re-raise to maintain compatibility with standard logger
+                self.callHandlers(error_record)
+            except Exception:
+                # If handler failed, log error to stderr (standard logging behavior)
+                sys.stderr.write(f"Error in logging handler: {error_record}\n")
