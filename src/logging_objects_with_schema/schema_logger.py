@@ -147,7 +147,9 @@ class SchemaLogger(logging.Logger):
         if data_problems:
             # Log validation errors as ERROR messages
             # Get caller information using inspect.stack() to ensure consistent behavior
-            # across different Python versions. The stack looks like:
+            # across different Python versions. Python 3.10 has issues with findCaller()
+            # and stacklevel parameter, so we use inspect.stack() as the primary method
+            # with findCaller() as a fallback. The stack looks like:
             # - Frame 0: this function (_log)
             # - Frame 1: logger.info() wrapper
             # - Frame 2: actual caller (test_function)
