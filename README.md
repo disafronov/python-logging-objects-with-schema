@@ -201,8 +201,11 @@ An empty schema is valid and does not cause errors. When using an empty schema,
 no `extra` fields will be included in log records, and any attempt to log with
 `extra` fields will result in validation errors being logged as ERROR messages.
 
-- An inner node is an object without `type` and `source`.
-- A leaf node is an object with both `type` and `source`.
+- An inner node is an object without `type` and `source` (neither field is present).
+- A leaf node is an object that has at least one of `type` or `source` fields.
+  However, a valid leaf node must have both `type` and `source` fields. If a
+  leaf node is missing either field or has an empty value, it will be reported
+  as a schema problem during validation.
 - `type` is one of the allowed Python type names: `"str"`, `"int"`, `"float"`,
   `"bool"`, or `"list"`.
 - For `"list"` type, an additional `item_type` field is required to declare
