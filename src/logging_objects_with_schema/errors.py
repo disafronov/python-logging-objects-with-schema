@@ -57,11 +57,17 @@ class DataProblem:
 
 
 class DataValidationError(Exception):
-    """Raised when log record data does not satisfy the configured schema.
+    """Exception type used to represent log data validation problems.
 
-    This exception is raised *after* the valid part of the log record
-    has already been formatted and sent to the underlying handler. This means
-    that even if validation fails, the valid fields will still appear in the log.
+    This exception is created when log record data does not satisfy the
+    configured schema. It is logged as an ERROR message *after* the valid
+    part of the log record has already been formatted and sent to the
+    underlying handler. This means that even if validation fails, the valid
+    fields will still appear in the log.
+
+    The exception is not raised to maintain 100% compatibility with standard
+    logger behavior. Instead, it is logged with ERROR level and includes
+    exception information (exc_info) for formatters to process.
 
     The exception message provides a summary description of the validation
     failure, while detailed information about individual problems is exposed
@@ -70,13 +76,10 @@ class DataValidationError(Exception):
     Attributes:
         problems: List of DataProblem instances describing each validation issue.
 
-    Example:
-        >>> try:
-        ...     logger.info("processing", extra={"user_id": "not-an-int"})
-        ... except DataValidationError as e:
-        ...     for problem in e.problems:
-        ...         print(f"Validation error: {problem.message}")
-        ...     # Note: valid fields were already logged before this exception
+    Note:
+        This exception is used internally by SchemaLogger and is logged
+        automatically. Applications do not need to catch it, as it is never
+        raised during normal operation.
     """
 
     def __init__(self, message: str, problems: list[DataProblem] | None = None) -> None:
