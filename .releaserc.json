@@ -29,7 +29,7 @@
         }],
         ["@semantic-release/git", {
             "assets": ["pyproject.toml", "uv.lock"],
-            "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+            "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}\n\nSigned-off-by: Release Bot <noreply@github.com>"
         }],
         ["@semantic-release/github", {}]
     ]
