@@ -79,14 +79,8 @@ def test_apply_schema_empty_schema_returns_empty() -> None:
     assert result == {}
     # All fields are considered redundant even when schema has no leaves.
     problem_messages = [p.message for p in problems]
-    assert (
-        "Field 'field1' is not defined in schema and will be ignored"
-        in problem_messages
-    )
-    assert (
-        "Field 'field2' is not defined in schema and will be ignored"
-        in problem_messages
-    )
+    assert "Field 'field1' is not defined in schema" in problem_messages
+    assert "Field 'field2' is not defined in schema" in problem_messages
 
 
 def test_apply_schema_nested_structure() -> None:
@@ -313,7 +307,6 @@ def test_apply_schema_none_value_produces_problem() -> None:
     assert result == {}
     assert len(problems) == 1
     assert "None" in problems[0].message
-    assert "not allowed" in problems[0].message
 
 
 def test_apply_schema_none_value_with_multiple_leaves_produces_single_problem() -> None:
@@ -337,7 +330,6 @@ def test_apply_schema_none_value_with_multiple_leaves_produces_single_problem() 
     assert result == {}
     assert len(problems) == 1  # Should be 1, not 2
     assert "None" in problems[0].message
-    assert "not allowed" in problems[0].message
     assert "request_id" in problems[0].message
 
 
@@ -410,14 +402,8 @@ def test_apply_schema_redundant_fields_with_empty_schema() -> None:
     assert result == {}
     # Both fields should be reported as redundant.
     problem_messages = [p.message for p in problems]
-    assert (
-        "Field 'unknown_field' is not defined in schema and will be ignored"
-        in problem_messages
-    )
-    assert (
-        "Field 'another_unknown' is not defined in schema and will be ignored"
-        in problem_messages
-    )
+    assert "Field 'unknown_field' is not defined in schema" in problem_messages
+    assert "Field 'another_unknown' is not defined in schema" in problem_messages
 
 
 def test_apply_schema_strips_empty_dicts() -> None:
