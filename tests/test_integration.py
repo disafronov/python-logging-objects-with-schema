@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.errors import SchemaValidationError
 from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
 from tests.conftest import _write_schema
 
@@ -132,27 +131,51 @@ def test_schema_file_in_current_working_directory(
     assert "test message" in output
 
 
-def test_schema_file_not_found_raises_error(
+def test_schema_file_not_found_terminates_application(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Schema file not found should raise SchemaValidationError."""
+    """Schema file not found should terminate application."""
+
+    import os
+    import sys
+    from io import StringIO
 
     # Change to directory without schema file
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(SchemaValidationError) as exc_info:
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
+    with pytest.raises(SystemExit):
         SchemaLogger("test")
 
-    assert exc_info.value.problems
-    assert any("not found" in str(p.message).lower() for p in exc_info.value.problems)
+    assert exit_called
+    assert exit_code == 1
+    stderr_content = stderr_output.getvalue()
+    assert "Schema has problems" in stderr_content
+    assert "not found" in stderr_content.lower()
 
 
-def test_schema_validation_error_on_invalid_schema(
+def test_schema_validation_error_on_invalid_schema_terminates_application(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Invalid schema should raise SchemaValidationError."""
+    """Invalid schema should terminate application."""
+
+    import os
+    import sys
+    from io import StringIO
 
     monkeypatch.chdir(tmp_path)
     _write_schema(
@@ -164,14 +187,27 @@ def test_schema_validation_error_on_invalid_schema(
         },
     )
 
-    with pytest.raises(SchemaValidationError) as exc_info:
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
+    with pytest.raises(SystemExit):
         SchemaLogger("test")
 
-    assert exc_info.value.problems
-    assert any(
-        "conflicts with reserved logging fields" in p.message
-        for p in exc_info.value.problems
-    )
+    assert exit_called
+    assert exit_code == 1
+    stderr_content = stderr_output.getvalue()
+    assert "Schema has problems" in stderr_content
+    assert "conflicts with reserved logging fields" in stderr_content
 
 
 def test_logger_with_setloggerclass_creates_schema_logger(
@@ -310,11 +346,15 @@ def test_logger_with_empty_schema(
     assert "another" in output
 
 
-def test_schema_file_permission_error_raises_schema_validation_error(
+def test_schema_file_permission_error_terminates_application(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Unreadable schema file should result in SchemaValidationError, not OSError."""
+    """Unreadable schema file should terminate application."""
+
+    import os
+    import sys
+    from io import StringIO
 
     import logging_objects_with_schema.schema_loader as schema_loader
 
@@ -339,12 +379,24 @@ def test_schema_file_permission_error_raises_schema_validation_error(
 
     monkeypatch.setattr(schema_loader.Path, "open", fake_open)
 
-    with pytest.raises(SchemaValidationError) as exc_info:
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
+    with pytest.raises(SystemExit):
         SchemaLogger("test-permission-error")
 
-    # Problems list should contain a message about failing to read the schema file
-    assert exc_info.value.problems
-    assert any(
-        "Failed to read schema file" in problem.message
-        for problem in exc_info.value.problems
-    )
+    assert exit_called
+    assert exit_code == 1
+    stderr_content = stderr_output.getvalue()
+    assert "Schema has problems" in stderr_content
+    assert "Failed to read schema file" in stderr_content

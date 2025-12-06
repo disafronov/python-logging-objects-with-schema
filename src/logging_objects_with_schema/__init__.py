@@ -7,10 +7,8 @@ according to an application-defined JSON schema.
 
 from __future__ import annotations
 
-from .errors import SchemaValidationError
 from .schema_logger import SchemaLogger
 
 __all__ = [
     "SchemaLogger",
-    "SchemaValidationError",
 ]

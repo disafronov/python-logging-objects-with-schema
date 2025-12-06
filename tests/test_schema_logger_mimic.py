@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.errors import SchemaValidationError
 from tests.conftest import _write_schema
 
 
@@ -127,11 +126,15 @@ def test_schema_logger_validates_extra_fields(
     assert "msg" in output
 
 
-def test_schema_logger_raises_schema_validation_error_on_bad_schema(
+def test_schema_logger_terminates_on_bad_schema(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SchemaLogger should raise SchemaValidationError when schema has problems."""
+    """SchemaLogger should terminate application when schema has problems."""
+
+    import os
+    import sys
+    from io import StringIO
 
     monkeypatch.chdir(tmp_path)
     # Use a root key that conflicts with logging.LogRecord field
@@ -144,8 +147,25 @@ def test_schema_logger_raises_schema_validation_error_on_bad_schema(
         },
     )
 
-    with pytest.raises(SchemaValidationError):
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
+    with pytest.raises(SystemExit):
         SchemaLogger("test-logger")
+
+    assert exit_called
+    assert exit_code == 1
+    assert "Schema has problems" in stderr_output.getvalue()
 
 
 def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
@@ -162,9 +182,26 @@ def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
 
     monkeypatch.chdir(tmp_path)
 
+    import os
+    import sys
+    from io import StringIO
+
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
     logging.setLoggerClass(SchemaLogger)
     try:
-        # 1) Write an invalid schema that triggers SchemaValidationError.
+        # 1) Write an invalid schema that triggers termination.
         _write_schema(
             tmp_path,
             {
@@ -174,26 +211,13 @@ def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
             },
         )
 
-        # Attempting to create/get the logger should raise SchemaValidationError,
+        # Attempting to create/get the logger should terminate the application,
         # and the partially initialised instance must be removed from cache.
-        with pytest.raises(SchemaValidationError):
+        with pytest.raises(SystemExit):
             logging.getLogger("bad-schema-logger")
 
-        # 2) Fix the schema on disk. Because schema compilation result is cached
-        # within the same process, subsequent attempts should still raise
-        # SchemaValidationError, but must not leave a broken logger instance
-        # in logging's internal cache.
-        _write_schema(
-            tmp_path,
-            {
-                "ServicePayload": {
-                    "RequestID": {"type": "str", "source": "request_id"},
-                },
-            },
-        )
-
-        with pytest.raises(SchemaValidationError):
-            logging.getLogger("bad-schema-logger")
+        assert exit_called
+        assert exit_code == 1
 
         # Ensure that the logger with this name is not left registered in the
         # logging manager cache after failed initialisation.
@@ -202,17 +226,19 @@ def test_schema_logger_does_not_leave_partially_initialised_logger_in_cache(
         logging.setLoggerClass(logging.Logger)
 
 
-def test_schema_logger_handles_oserror_from_getcwd_and_cleans_up(
+def test_schema_logger_handles_oserror_from_getcwd_and_terminates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SchemaLogger should catch OSError from os.getcwd() and clean up logger.
+    """SchemaLogger should catch OSError from os.getcwd() and terminate.
 
     If os.getcwd() raises OSError (e.g., when CWD is deleted), the exception
-    should be caught, logger should be cleaned up from cache, and exception
-    should be re-raised.
+    should be converted to SchemaProblem, logger should be cleaned up from cache,
+    and application should be terminated.
     """
     import os
+    import sys
+    from io import StringIO
 
     import logging_objects_with_schema.schema_loader as schema_loader
 
@@ -226,6 +252,19 @@ def test_schema_logger_handles_oserror_from_getcwd_and_cleans_up(
 
     monkeypatch.setattr(os, "getcwd", fake_getcwd)
 
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
     logging.setLoggerClass(SchemaLogger)
     try:
         # Clear schema cache to force recompilation
@@ -235,10 +274,14 @@ def test_schema_logger_handles_oserror_from_getcwd_and_cleans_up(
             schema_loader._resolved_schema_path = None
             schema_loader._cached_cwd = None
 
-        # Attempting to create/get the logger should raise OSError,
+        # Attempting to create/get the logger should terminate the application,
         # and the partially initialised instance must be removed from cache.
-        with pytest.raises(OSError, match="Current working directory"):
+        with pytest.raises(SystemExit):
             logging.getLogger("oserror-logger")
+
+        assert exit_called
+        assert exit_code == 1
+        assert "Schema has problems" in stderr_output.getvalue()
 
         # Ensure that the logger with this name is not left registered in the
         # logging manager cache after failed initialisation.
@@ -248,16 +291,20 @@ def test_schema_logger_handles_oserror_from_getcwd_and_cleans_up(
         logging.setLoggerClass(logging.Logger)
 
 
-def test_schema_logger_handles_runtimeerror_from_lock_and_cleans_up(
+def test_schema_logger_handles_runtimeerror_from_lock_and_terminates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SchemaLogger should catch RuntimeError from threading locks and clean up.
+    """SchemaLogger should catch RuntimeError from threading locks and terminate.
 
     If a threading lock raises RuntimeError (e.g., deadlock detection),
-    the exception should be caught, logger should be cleaned up from cache,
-    and exception should be re-raised.
+    the exception should be converted to SchemaProblem, logger should be cleaned
+    up from cache, and application should be terminated.
     """
+    import os
+    import sys
+    from io import StringIO
+
     import logging_objects_with_schema.schema_loader as schema_loader
 
     monkeypatch.chdir(tmp_path)
@@ -275,6 +322,19 @@ def test_schema_logger_handles_runtimeerror_from_lock_and_cleans_up(
     fake_lock = FakeLock()
     monkeypatch.setattr(schema_loader, "_cache_lock", fake_lock)
 
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
     logging.setLoggerClass(SchemaLogger)
     try:
         # Clear schema cache to force recompilation
@@ -284,10 +344,14 @@ def test_schema_logger_handles_runtimeerror_from_lock_and_cleans_up(
             schema_loader._resolved_schema_path = None
             schema_loader._cached_cwd = None
 
-        # Attempting to create/get the logger should raise RuntimeError,
+        # Attempting to create/get the logger should terminate the application,
         # and the partially initialised instance must be removed from cache.
-        with pytest.raises(RuntimeError, match="Lock acquisition failed"):
+        with pytest.raises(SystemExit):
             logging.getLogger("runtimeerror-logger")
+
+        assert exit_called
+        assert exit_code == 1
+        assert "Schema has problems" in stderr_output.getvalue()
 
         # Ensure that the logger with this name is not left registered in the
         # logging manager cache after failed initialisation.
@@ -297,17 +361,21 @@ def test_schema_logger_handles_runtimeerror_from_lock_and_cleans_up(
         logging.setLoggerClass(logging.Logger)
 
 
-def test_schema_logger_handles_valueerror_and_cleans_up(
+def test_schema_logger_handles_valueerror_and_terminates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SchemaLogger should catch ValueError and clean up logger.
+    """SchemaLogger should catch ValueError and terminate.
 
     If ValueError is raised during schema compilation (outside of the
     try-except block in _compile_schema_internal), the exception should be
-    caught, logger should be cleaned up from cache, and exception should be
-    re-raised.
+    converted to SchemaProblem, logger should be cleaned up from cache,
+    and application should be terminated.
     """
+    import os
+    import sys
+    from io import StringIO
+
     import logging_objects_with_schema.schema_loader as schema_loader
 
     monkeypatch.chdir(tmp_path)
@@ -320,6 +388,19 @@ def test_schema_logger_handles_valueerror_and_cleans_up(
 
     monkeypatch.setattr(schema_loader, "_get_schema_path", fake_get_schema_path)
 
+    exit_called = False
+    exit_code = None
+    stderr_output = StringIO()
+
+    def fake_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(sys, "stderr", stderr_output)
+
     logging.setLoggerClass(SchemaLogger)
     try:
         # Clear schema cache to force recompilation
@@ -329,10 +410,14 @@ def test_schema_logger_handles_valueerror_and_cleans_up(
             schema_loader._resolved_schema_path = None
             schema_loader._cached_cwd = None
 
-        # Attempting to create/get the logger should raise ValueError,
+        # Attempting to create/get the logger should terminate the application,
         # and the partially initialised instance must be removed from cache.
-        with pytest.raises(ValueError, match="Unexpected value error"):
+        with pytest.raises(SystemExit):
             logging.getLogger("valueerror-logger")
+
+        assert exit_called
+        assert exit_code == 1
+        assert "Schema has problems" in stderr_output.getvalue()
 
         # Ensure that the logger with this name is not left registered in the
         # logging manager cache after failed initialisation.
