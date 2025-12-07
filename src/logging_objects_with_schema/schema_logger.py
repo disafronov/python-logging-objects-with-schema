@@ -189,9 +189,45 @@ class SchemaLogger(logging.Logger):
             # Format error message as JSON for machine processing
             validation_errors = []
             for problem in data_problems:
-                error_obj = json.loads(problem.message)
-                validation_errors.append(error_obj)
-            error_msg = json.dumps({"validation_errors": validation_errors})
+                try:
+                    error_obj = json.loads(problem.message)
+                    validation_errors.append(error_obj)
+                except (json.JSONDecodeError, TypeError) as exc:
+                    # Defensive handling: if problem.message is not valid JSON,
+                    # create a fallback error object. This should never happen in
+                    # normal operation since problem.message is always created via
+                    # _create_validation_error_json, but protects against unexpected
+                    # data corruption or manual DataProblem creation.
+                    validation_errors.append(
+                        {
+                            "field": repr("unknown"),
+                            "error": repr(f"Failed to parse validation error: {exc}"),
+                            "value": repr(problem.message),
+                        }
+                    )
+
+            try:
+                error_msg = json.dumps({"validation_errors": validation_errors})
+            except (TypeError, ValueError) as exc:
+                # Defensive handling: if serialization fails, create a fallback
+                # error message. This should never happen in normal operation since
+                # validation_errors contains only dicts with primitive values, but
+                # protects against unexpected data corruption.
+                error_msg = json.dumps(
+                    {
+                        "validation_errors": [
+                            {
+                                "field": repr("unknown"),
+                                "error": repr(
+                                    f"Failed to serialize validation errors: {exc}"
+                                ),
+                                "value": repr(
+                                    "validation errors could not be serialized"
+                                ),
+                            }
+                        ]
+                    }
+                )
             error_record = self.makeRecord(
                 self.name,
                 logging.ERROR,
