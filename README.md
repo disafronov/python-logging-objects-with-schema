@@ -147,6 +147,9 @@ JSON, invalid structure, etc.), the application is terminated after logging
 schema problems to stderr. Schema validation happens when the first logger
 instance is created.
 
+**Note**: The schema is compiled once per process and cached. Schema changes
+require an application restart to take effect. The library is thread-safe.
+
 A valid empty schema (`{}`) is allowed and will result in no `extra` fields
 being included in log records.
 
@@ -247,6 +250,3 @@ Example:
 
 With `extra={"request_id": "abc-123"}`, the value appears in both
 `ServicePayload.RequestID` and `ServicePayload.Metadata.ID`.
-
-**Note**: The schema is compiled once per process and cached. Schema changes
-require an application restart to take effect. The library is thread-safe.
