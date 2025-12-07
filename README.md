@@ -166,11 +166,30 @@ logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
 - Schema tree depth is limited to a maximum nesting level (currently 100). Any
   branch that exceeds this depth is ignored and reported as a schema problem.
 
-  If the schema file is not found, or cannot be read/parsed/validated, the
-  logger instance is not created, schema problems are logged to stderr, and
-  the application is terminated via `os._exit(1)`. The error message contains
-  a detailed description of all issues, including the path where the file was
-  expected (based on the current working directory at schema discovery time).
+When a `SchemaLogger` instance is created (via `logging.getLogger()` after
+`logging.setLoggerClass(SchemaLogger)`), the library searches for the schema
+file, parses the JSON, and walks the entire tree to collect all problems with
+the schema.
+
+If there are **any** problems with the schema (missing file, broken JSON,
+invalid `type` values, conflicting root fields that match system logging
+fields, malformed structure, etc.):
+
+- the logger instance is not created (schema validation happens before
+  the logger is initialized);
+- schema problems are logged to stderr in the format:
+  `"Schema has problems: {problem1}; {problem2}; ..."`;
+- the application is terminated via `os._exit(1)`.
+
+If there are no problems, the schema is compiled and the logger is created.
+A valid empty schema (e.g., `{}` or a schema with only inner nodes and no
+leaves) is treated as valid and does not cause errors. The logger is created
+successfully, but no `extra` fields will be included in log records.
+
+**Note**: System-level errors (OSError, ValueError, RuntimeError) that occur
+during schema compilation are converted to `SchemaProblem` instances and
+handled the same way as schema validation problems - the application is
+terminated after logging the error to stderr.
 
 An example schema:
 
@@ -213,6 +232,16 @@ no `extra` fields will be included in log records, and any attempt to log with
   `"bool"`) are allowed. Nested lists and dictionaries are not permitted as
   list elements.
 - `source` is the name of the field in `extra` from which the value is taken.
+
+### Schema root key restrictions
+
+- The library protects system fields from the standard `logging` module
+  (attributes of `LogRecord` and logger internals) by preventing their use as
+  root keys in the schema.
+- If a root key in the schema conflicts with a system logging field, a
+  `SchemaProblem` is generated and the schema validation fails.
+- Responsibility for ensuring compatibility with other logging libraries and
+  formatters lies with the developer when writing the schema.
 
 ### List-typed fields
 
@@ -265,7 +294,7 @@ logger.info(
 In this case the `tags` value is rejected, a `DataProblem` is recorded with a
 JSON message containing field, error, and value information.
 
-and an ERROR message is logged **after** the log record has been emitted with
+And an ERROR message is logged **after** the log record has been emitted with
 the JSON format: `{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`.
 All fields are serialized via `repr()` for safety and consistency.
 
@@ -305,77 +334,16 @@ where the type matches, and validation problems will be reported for the
 mismatched locations. It is the schema author's responsibility to ensure
 consistent type expectations when reusing a `source` field.
 
-## Behaviour when loading the schema
-
-- When a `SchemaLogger` instance is created (via `logging.getLogger()` after
-  `logging.setLoggerClass(SchemaLogger)`), the library:
-  - searches for `logging_objects_with_schema.json` by walking upward from
-    the current working directory until it finds the file or reaches the
-    filesystem root;
-  - parses the JSON;
-  - walks the entire tree and collects all problems with the schema.
-- If there are **any** problems with the schema (missing file, broken JSON,
-  invalid `type` values, conflicting root fields that match system logging
-  fields, malformed structure, etc.):
-  - the logger instance is not created (schema validation happens before
-    the logger is initialized);
-  - schema problems are logged to stderr in the format:
-    `"Schema has problems: {problem1}; {problem2}; ..."`;
-  - the application is terminated via `os._exit(1)`.
-- If there are no problems:
-  - the schema is compiled into a `CompiledSchema`;
-  - the logger is created and starts using this schema to validate `extra`
-    fields.
-  - A valid empty schema (e.g., `{}` or a schema with only inner nodes and no
-    leaves) is treated as valid and does not cause errors. The logger is created
-    successfully, but no `extra` fields will be included in log records.
-
-**Note**: System-level errors (OSError, ValueError, RuntimeError) that occur
-during schema compilation are converted to `SchemaProblem` instances and
-handled the same way as schema validation problems - the application is
-terminated after logging the error to stderr.
-
 ## Schema caching and thread safety
 
-- The library caches compiled schemas to avoid recompiling the same schema file
-  on every logger creation.
-- The cache is keyed by the absolute schema file path and stores both the
-  compiled schema and any discovered problems. Once a schema (or its absence /
-  invalidity) has been observed for a given path, subsequent calls reuse the
-  cached result within the same process without re-reading or re-compiling the
-  schema file.
-- This includes invalid schemas: once a schema file has been found to be
-  invalid, the corresponding (typically empty) `CompiledSchema` and its
-  `SchemaProblem`s are reused for the lifetime of the process.
+- The library caches compiled schemas after the first load. The schema is
+  effectively loaded and compiled **once per process** for a given schema path.
+  Subsequent logger instances reuse the cached compiled schema.
 - Schema compilation and cache access are **thread-safe**: multiple threads can
   safely create `SchemaLogger` instances concurrently without race conditions.
-- The schema is effectively loaded and compiled **once per process** for a
-  given schema path. Subsequent logger instances reuse the cached compiled
-  schema.
 - **Note**: The library does not provide a mechanism to reload the schema
   without restarting the application. This is a deliberate design decision to
   ensure schema consistency throughout the application lifecycle.
-- **Cache invalidation**: The library maintains two levels of caching:
-  - Path cache: If a previously found schema file is deleted, the path cache
-    is invalidated and a new search is performed. If the file is recreated at
-    the same path, the cached compiled schema will be reused (since the cache
-    key is the absolute path). If the file is recreated at a different path,
-    it will be treated as a new schema and compiled separately.
-  - Compiled schema cache: Once a schema has been compiled for a given path,
-    the compiled result is cached for the lifetime of the process. Even if the
-    schema file is deleted and recreated at the same path with different
-    content, the old compiled schema will continue to be used until the
-    application is restarted.
-
-## Schema root key restrictions
-
-- The library protects system fields from the standard `logging` module
-  (attributes of `LogRecord` and logger internals) by preventing their use as
-  root keys in the schema.
-- If a root key in the schema conflicts with a system logging field, a
-  `SchemaProblem` is generated and the schema validation fails.
-- Responsibility for ensuring compatibility with other logging libraries and
-  formatters lies with the developer when writing the schema.
 
 ## Behaviour when logging data
 
@@ -386,43 +354,12 @@ terminated after logging the error to stderr.
   3. The runtime type of the value strictly matches the declared Python type
      (exact type match is used, e.g. `bool` is not accepted where `int` is
      expected, and vice versa).
-- If:
-  - the compiled schema has no valid leaves (it is effectively empty, so no
-    `extra` keys are ever allowed to contribute data);
-  - a field is not described in the schema;
-  - the type does not match the declared type;
-  - the value is None (None values are not allowed);
-  - the field is considered redundant,
-  **it is simply not included in the final log record**.
-
-In all of these cases a `DataProblem` is recorded for each offending field, and
-if at least one problem is present, a single ERROR message is logged
-**after** the log record has been emitted. The error message format is JSON:
-`{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`.
-All fields are serialized via `repr()` for safety and consistency.
-
+- Fields that do not meet these conditions are simply not included in the final
+  log record (see "Strictness guarantees" above for details on validation
+  error reporting).
 - When a `source` is used in multiple leaves (see "Multiple leaves with the same
   source" above), the value is validated and written independently for each leaf
   location.
 - Before emitting the final structured payload, the library strips empty
   dictionaries and `None` values from nested structures so that only meaningful
   data appears in the resulting log record.
-
-High-level algorithm inside `SchemaLogger`:
-
-- For every call to `logger.info` / `logger.error` / `logger.log`:
-  1. All user-provided fields are taken from `extra`.
-  2. A new structured payload is built from the schema and the given `extra`.
-  3. Only this structured payload is passed to the underlying stdlib logger.
-  4. After logging, if any validation problems were detected, a single
-     ERROR message is logged with the JSON format:
-     `{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`
-     (no exception is raised, ensuring 100% compatibility with standard logger behavior).
-     All fields are serialized via `repr()` for safety and consistency.
-
-## Error handling
-
-- Schema problems are handled internally: errors are logged to stderr and
-  the application is terminated via `os._exit(1)`.
-- No exceptions are raised by `SchemaLogger` during initialization, making
-  it a true drop-in replacement for `logging.Logger`.
