@@ -263,12 +263,11 @@ logger.info(
 ```
 
 In this case the `tags` value is rejected, a `DataProblem` is recorded with a
-message similar to:
-
-> Field 'tags' is a list but contains elements with types [...]; expected all elements to be of type str
+JSON message containing field, error, and value information.
 
 and an ERROR message is logged **after** the log record has been emitted with
-the format: `"Log data does not match schema: {problem1}; {problem2}; ..."`.
+the JSON format: `{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`.
+All fields are serialized via `repr()` for safety and consistency.
 
 ### Multiple leaves with the same source
 
@@ -387,8 +386,9 @@ terminated after logging the error to stderr.
 
 In all of these cases a `DataProblem` is recorded for each offending field, and
 if at least one problem is present, a single ERROR message is logged
-**after** the log record has been emitted. The error message format is:
-`"Log data does not match schema: {problem1}; {problem2}; ..."`.
+**after** the log record has been emitted. The error message format is JSON:
+`{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`.
+All fields are serialized via `repr()` for safety and consistency.
 
 - When a `source` is used in multiple leaves (see "Multiple leaves with the same
   source" above), the value is validated and written independently for each leaf
@@ -404,9 +404,10 @@ High-level algorithm inside `SchemaLogger`:
   2. A new structured payload is built from the schema and the given `extra`.
   3. Only this structured payload is passed to the underlying stdlib logger.
   4. After logging, if any validation problems were detected, a single
-     ERROR message is logged with the format:
-     `"Log data does not match schema: {problem1}; {problem2}; ..."`
+     ERROR message is logged with the JSON format:
+     `{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`
      (no exception is raised, ensuring 100% compatibility with standard logger behavior).
+     All fields are serialized via `repr()` for safety and consistency.
 
 ## Error handling
 

@@ -61,7 +61,8 @@ def test_schema_logger_type_mismatch_logs_error_after_logging(
     assert "user_id" not in main_log
     # Validation error should be logged as ERROR
     assert "ERROR" in output
-    assert "Log data does not match schema" in output
+    # Error message should be JSON with validation_errors
+    assert "validation_errors" in output
     # Details of the problem should be included in the error message
     assert "user_id" in output
 
@@ -155,7 +156,8 @@ def test_validation_error_record_has_function_name(
 
     # Check ERROR record for validation error
     assert error_record.levelno == logging.ERROR
-    assert "Log data does not match schema" in str(error_record.msg)
+    # Error message should be JSON with validation_errors
+    assert "validation_errors" in str(error_record.msg)
 
     # Verify that funcName is set (not None) - this is the main fix we made
     # Previously, func was not passed to makeRecord, causing funcName to be None
