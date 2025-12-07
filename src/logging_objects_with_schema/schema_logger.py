@@ -30,6 +30,12 @@ _USE_FINDCALLER = sys.version_info >= (3, 11)
 def _log_schema_problems_and_exit(problems: list[SchemaProblem]) -> None:
     """Log schema problems to stderr and terminate the application.
 
+    Uses os._exit(1) instead of sys.exit(1) to ensure immediate termination
+    without running cleanup handlers (atexit, finally blocks, etc.). This is
+    important because schema problems indicate a fatal configuration error that
+    should stop the application immediately, and we don't want any cleanup code
+    to run (which might try to use the broken logger or cause additional errors).
+
     Args:
         problems: List of schema problems to log.
     """
@@ -39,6 +45,7 @@ def _log_schema_problems_and_exit(problems: list[SchemaProblem]) -> None:
     error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
     sys.stderr.write(error_msg)
     sys.stderr.flush()
+    # Use os._exit() for immediate termination without cleanup handlers
     os._exit(1)
 
 
@@ -138,6 +145,12 @@ class SchemaLogger(logging.Logger):
             extra or {},
         )
 
+        # Emit the main log record first, even if there are validation problems.
+        # This ensures 100% compatibility with standard logger behavior: the user's
+        # log message is always emitted, and validation errors are reported separately
+        # as additional ERROR messages. This approach guarantees that the application
+        # continues to work normally even when validation problems occur (no exceptions
+        # are raised, no log records are lost).
         super()._log(
             level,
             msg,
@@ -150,9 +163,12 @@ class SchemaLogger(logging.Logger):
             stacklevel=stacklevel + 1,
         )
 
+        # If there were validation problems, log them as separate ERROR messages
+        # after the main log record has been emitted. This ensures the main message
+        # is always logged first, and validation errors are clearly separated.
         if data_problems:
-            # Log validation errors as ERROR messages
-            # Get caller information for the error log record.
+            # Get caller information for the error log record so that validation
+            # errors point to the same location in user code as the original log call.
             # Python 3.11+ has improved findCaller() with proper stacklevel support,
             # so we use it as the primary method for better performance.
             # For Python < 3.11, we fall back to inspect.stack() due to known issues
@@ -186,10 +202,23 @@ class SchemaLogger(logging.Logger):
                     fn, lno, func, sinfo = self.findCaller(
                         stack_info=False, stacklevel=stacklevel + 1
                     )
-            # Format error message as JSON for machine processing
+            # Format error message as JSON for machine processing.
+            # Each DataProblem.message is already a JSON string (created by
+            # _create_validation_error_json) with structure:
+            #   {"field": "...", "error": "...", "value": "..."}
+            # We parse them back to dicts and combine into a single JSON object
+            # with all validation errors. The final structure is:
+            #   {"validation_errors": [{"field": "...", "error": "...",
+            #   "value": "..."}, ...]}
+            # This allows consumers to parse the error message as structured data
+            # and programmatically extract field names, error types, and values.
             validation_errors = []
             for problem in data_problems:
                 try:
+                    # Parse the JSON string back to a dict so we can combine
+                    # all errors into a single JSON object. Each error object
+                    # maintains the same structure: field, error, value
+                    # (all via repr()).
                     error_obj = json.loads(problem.message)
                     validation_errors.append(error_obj)
                 except (json.JSONDecodeError, TypeError) as exc:
@@ -197,7 +226,9 @@ class SchemaLogger(logging.Logger):
                     # create a fallback error object. This should never happen in
                     # normal operation since problem.message is always created via
                     # _create_validation_error_json, but protects against unexpected
-                    # data corruption or manual DataProblem creation.
+                    # data corruption or manual DataProblem creation. The fallback
+                    # preserves the same structure (field, error, value) for
+                    # consistency.
                     validation_errors.append(
                         {
                             "field": repr("unknown"),
@@ -207,12 +238,17 @@ class SchemaLogger(logging.Logger):
                     )
 
             try:
+                # Combine all validation errors into a single JSON object.
+                # The resulting string will be used as the log message for the
+                # ERROR record, allowing structured parsing by log consumers.
                 error_msg = json.dumps({"validation_errors": validation_errors})
             except (TypeError, ValueError) as exc:
                 # Defensive handling: if serialization fails, create a fallback
                 # error message. This should never happen in normal operation since
-                # validation_errors contains only dicts with primitive values, but
-                # protects against unexpected data corruption.
+                # validation_errors contains only dicts with primitive values (all
+                # values are already serialized via repr()), but protects against
+                # unexpected data corruption or edge cases in JSON serialization.
+                # The fallback ensures we always have a valid JSON error message.
                 error_msg = json.dumps(
                     {
                         "validation_errors": [
