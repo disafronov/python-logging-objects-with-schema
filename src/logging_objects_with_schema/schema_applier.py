@@ -6,12 +6,33 @@ to user-provided extra fields, used by SchemaLogger.
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 from .errors import DataProblem
 from .schema_loader import CompiledSchema, SchemaLeaf
+
+
+def _create_validation_error_json(field: str, error: str, value: Any) -> str:
+    """Create JSON string for a single validation error.
+
+    Args:
+        field: Field name that caused the validation error.
+        error: Error description.
+        value: Invalid value that caused the error.
+
+    Returns:
+        JSON string with field, error, and value (all via repr() for safety).
+    """
+    return json.dumps(
+        {
+            "field": repr(field),
+            "error": repr(error),
+            "value": repr(value),
+        }
+    )
 
 
 def _validate_list_value(
@@ -34,9 +55,8 @@ def _validate_list_value(
         DataProblem if validation fails, None if validation succeeds.
     """
     if item_expected_type is None:
-        return DataProblem(
-            f"Field '{source}' is list but has no item type configured",
-        )
+        error_msg = "is a list but has no item type configured"
+        return DataProblem(_create_validation_error_json(source, error_msg, value))
 
     if len(value) == 0:
         # Empty lists are always valid
@@ -47,12 +67,13 @@ def _validate_list_value(
     }
 
     if invalid_item_types:
-        return DataProblem(
-            f"Field '{source}' is a list but contains elements "
+        error_msg = (
+            f"is a list but contains elements "
             f"with types {sorted(invalid_item_types)}; "
             f"expected all elements to be of type "
-            f"{item_expected_type.__name__}",
+            f"{item_expected_type.__name__}"
         )
+        return DataProblem(_create_validation_error_json(source, error_msg, value))
 
     return None
 
@@ -107,11 +128,12 @@ def _validate_and_apply_leaf(
     # bool is a subclass of int). This ensures that the actual
     # runtime type matches the schema type exactly.
     if type(value) is not leaf.expected_type:
+        error_msg = (
+            f"has type {type(value).__name__}, "
+            f"expected {leaf.expected_type.__name__}"
+        )
         problems.append(
-            DataProblem(
-                f"Field '{source}' has type {type(value).__name__}, "
-                f"expected {leaf.expected_type.__name__}",
-            ),
+            DataProblem(_create_validation_error_json(source, error_msg, value))
         )
         return
 
@@ -225,10 +247,9 @@ def _apply_schema_internal(
         # Check for None values explicitly (None values are not allowed)
         # This check must be done once per source, not once per leaf
         if value is None:
+            error_msg = "is None"
             problems.append(
-                DataProblem(
-                    f"Field '{source}' is None",
-                ),
+                DataProblem(_create_validation_error_json(source, error_msg, None))
             )
             continue
 
@@ -244,10 +265,11 @@ def _apply_schema_internal(
         else (key for key in extra_values.keys() if key not in used_sources)
     )
     for key in redundant_keys:
+        error_msg = "is not defined in schema"
         problems.append(
             DataProblem(
-                f"Field '{key}' is not defined in schema",
-            ),
+                _create_validation_error_json(key, error_msg, extra_values[key])
+            )
         )
 
     cleaned_extra = _strip_empty(extra)
