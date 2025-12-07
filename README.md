@@ -355,6 +355,17 @@ terminated after logging the error to stderr.
 - **Note**: The library does not provide a mechanism to reload the schema
   without restarting the application. This is a deliberate design decision to
   ensure schema consistency throughout the application lifecycle.
+- **Cache invalidation**: The library maintains two levels of caching:
+  - Path cache: If a previously found schema file is deleted, the path cache
+    is invalidated and a new search is performed. If the file is recreated at
+    the same path, the cached compiled schema will be reused (since the cache
+    key is the absolute path). If the file is recreated at a different path,
+    it will be treated as a new schema and compiled separately.
+  - Compiled schema cache: Once a schema has been compiled for a given path,
+    the compiled result is cached for the lifetime of the process. Even if the
+    schema file is deleted and recreated at the same path with different
+    content, the old compiled schema will continue to be used until the
+    application is restarted.
 
 ## Schema root key restrictions
 
