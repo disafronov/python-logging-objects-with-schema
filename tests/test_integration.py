@@ -306,7 +306,8 @@ def test_logger_validates_data_after_logging(
 
     # Validation error should be logged as ERROR
     assert "ERROR" in output
-    assert "Log data does not match schema" in output
+    # Error message should be JSON with validation_errors
+    assert "validation_errors" in output
 
 
 def test_logger_with_empty_schema(
@@ -340,7 +341,8 @@ def test_logger_with_empty_schema(
 
     # Validation error should be logged as ERROR
     assert "ERROR" in output
-    assert "Log data does not match schema" in output
+    # Error message should be JSON with validation_errors
+    assert "validation_errors" in output
     # Details of problems should be included in the error message
     assert "unknown_field" in output
     assert "another" in output

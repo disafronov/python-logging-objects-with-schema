@@ -10,6 +10,7 @@ logger behavior.
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 import os
 import sys
@@ -185,9 +186,12 @@ class SchemaLogger(logging.Logger):
                     fn, lno, func, sinfo = self.findCaller(
                         stack_info=False, stacklevel=stacklevel + 1
                     )
-            # Format error message with details of all problems
-            problem_messages = [problem.message for problem in data_problems]
-            error_msg = f"Log data does not match schema: {'; '.join(problem_messages)}"
+            # Format error message as JSON for machine processing
+            validation_errors = []
+            for problem in data_problems:
+                error_obj = json.loads(problem.message)
+                validation_errors.append(error_obj)
+            error_msg = json.dumps({"validation_errors": validation_errors})
             error_record = self.makeRecord(
                 self.name,
                 logging.ERROR,

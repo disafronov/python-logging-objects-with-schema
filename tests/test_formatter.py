@@ -73,14 +73,19 @@ def test_strip_empty_preserves_non_dict_values() -> None:
 
 def test_apply_schema_empty_schema_returns_empty() -> None:
     """apply_schema_internal with empty schema should return empty dict and problems."""
+    import json
+
     schema = CompiledSchema(leaves=[])
     extra = {"field1": "value1", "field2": 42}
     result, problems = apply_schema_internal(schema, extra)
     assert result == {}
     # All fields are considered redundant even when schema has no leaves.
-    problem_messages = [p.message for p in problems]
-    assert "Field 'field1' is not defined in schema" in problem_messages
-    assert "Field 'field2' is not defined in schema" in problem_messages
+    problem_fields = []
+    for p in problems:
+        error_obj = json.loads(p.message)
+        problem_fields.append(error_obj["field"])
+    assert "'field1'" in problem_fields
+    assert "'field2'" in problem_fields
 
 
 def test_apply_schema_nested_structure() -> None:
@@ -393,6 +398,8 @@ def test_apply_schema_redundant_fields_with_non_empty_schema() -> None:
 
 def test_apply_schema_redundant_fields_with_empty_schema() -> None:
     """Redundant fields should produce problems when schema is empty."""
+    import json
+
     schema = CompiledSchema(leaves=[])
     extra = {
         "unknown_field": "value",
@@ -401,9 +408,12 @@ def test_apply_schema_redundant_fields_with_empty_schema() -> None:
     result, problems = apply_schema_internal(schema, extra)
     assert result == {}
     # Both fields should be reported as redundant.
-    problem_messages = [p.message for p in problems]
-    assert "Field 'unknown_field' is not defined in schema" in problem_messages
-    assert "Field 'another_unknown' is not defined in schema" in problem_messages
+    problem_fields = []
+    for p in problems:
+        error_obj = json.loads(p.message)
+        problem_fields.append(error_obj["field"])
+    assert "'unknown_field'" in problem_fields
+    assert "'another_unknown'" in problem_fields
 
 
 def test_apply_schema_strips_empty_dicts() -> None:
