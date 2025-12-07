@@ -2,49 +2,38 @@
 
 This library provides a logger subclass built on top of the standard `logging`
 module that strictly controls additional `extra` fields using a JSON schema.
-
-## Core idea
-
-- The standard `logging` package is used (your application configures handlers
-  and formatting as usual).
-- `SchemaLogger` is a subclass of `logging.Logger` designed to be used as a
-  drop-in replacement via `logging.setLoggerClass(SchemaLogger)`.
-- The schema is stored in a JSON file named `logging_objects_with_schema.json`
-  in the application root directory.
-- Any user-provided `extra` fields are included in the log **only if** they are
-  described in the schema and match the declared Python type.
-- The library is universal and works with any formatters from the standard
-  `logging` module. It is not tied to any specific log format or logging library.
+`SchemaLogger` is a drop-in replacement for `logging.Logger` that validates
+`extra` fields against a JSON schema file (`logging_objects_with_schema.json`)
+in your application root directory.
 
 ## Schema as a contract
 
 The JSON schema is treated as a **contract** between all parties that produce
-and consume logs in the system. It defines which structured fields are allowed
-to appear in logs and which types they must have.
+and consume logs in the system. The schema file (`logging_objects_with_schema.json`)
+is a shared, versioned artifact that defines which structured fields are allowed
+to appear in logs and which Python types they must have. This contract ensures
+that all downstream consumers (search systems, alerts, dashboards, external
+systems) can rely on a consistent log structure.
 
-- Application code must only send `extra` fields that are described in the schema
-  and match the declared Python types. Any deviation (unknown fields, wrong types,
-  `None` values, disallowed list elements) is logged as an ERROR message
-  *after* the log record has been emitted.
-- The schema file (`logging_objects_with_schema.json`) is a shared, versioned
-  artifact that defines the shape of structured log payloads for all downstream
-  consumers (search, alerts, dashboards, external systems).
+**Strictness guarantees:**
 
-## Strictness guarantees
-
-- Only fields explicitly described in the JSON schema (as leaves with `type` and
-  `source`) can ever reach your logs.
-- Any `extra` field that is **not** described in the schema is treated as a data
-  error: it is dropped from the log output and recorded as a validation problem.
-- Any mismatch between runtime values and the declared types is also treated as
-  a data error.
-- All validation problems (unknown fields, wrong types, disallowed list
-  elements, `None` values, etc.) are aggregated and logged as a single
-  ERROR message **after** the log record has been emitted, ensuring 100%
-  compatibility with standard logger behavior (no exceptions are raised).
-- The schema is treated as the only source of truth for which `extra` fields
-  are allowed to appear in logs. Any deviation from the schema is considered a
-  contract violation between the producer of `extra` and the schema author.
+- **`extra` fields never go directly into logs.** They are always projected
+  through the schema: values from `extra` are taken by `source` field names
+  and placed into the log structure according to the schema paths. Only fields
+  explicitly described in the schema (as leaves with `type` and `source`) can
+  ever reach your logs. The schema is the only source of truth for which
+  `extra` fields are allowed.
+- Any `extra` field that is **not** described in the schema is treated as a
+  data error: it is dropped from the log output and recorded as a validation
+  problem.
+- Any mismatch between runtime values and the declared types (wrong types,
+  `None` values, disallowed list elements) is also treated as a data error.
+- All validation problems are aggregated and logged as a single ERROR message
+  **after** the log record has been emitted, ensuring 100% compatibility with
+  standard logger behavior (no exceptions are raised).
+- Application code must only send `extra` fields that are described in the
+  schema and match the declared Python types. Any deviation from the schema
+  is considered a contract violation.
 
 ## Installation
 
@@ -144,52 +133,22 @@ logger = logging.getLogger("service")
 # logged as ERROR messages. No exception handling is needed.
 logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
 # The valid part of the log is emitted, and validation errors are logged
-# as ERROR messages with details about the problems.
+# as ERROR messages in JSON format: {"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}
 ```
-
-### API compatibility with ``logging.Logger``
-
-- ``SchemaLogger`` is a subclass of ``logging.Logger`` and can be used as a
-  drop-in replacement via ``logging.setLoggerClass(SchemaLogger)``.
-- The public methods of ``SchemaLogger`` mirror the standard ``logging.Logger``
-  API and accept the same arguments: ``msg, *args, **kwargs``.
-- The only behavioural difference is that the named ``extra`` argument is
-  intercepted, validated according to the JSON schema, and only the validated
-  subset is passed further into the standard logging pipeline.
 
 ## Schema location and format
 
-- Schema file: `logging_objects_with_schema.json`.
-- Location: **application root directory**. The library searches upward from the
-  current working directory for the schema file itself, walking up the directory
-  tree until it finds the file or reaches the filesystem root.
-- Schema tree depth is limited to a maximum nesting level (currently 100). Any
-  branch that exceeds this depth is ignored and reported as a schema problem.
+The schema file `logging_objects_with_schema.json` must be located in your
+application root directory. The library searches upward from the current working
+directory until it finds the file or reaches the filesystem root.
 
-When a `SchemaLogger` instance is created (via `logging.getLogger()` after
-`logging.setLoggerClass(SchemaLogger)`), the library searches for the schema
-file, parses the JSON, and walks the entire tree to collect all problems with
-the schema.
+**Important**: If there are any problems with the schema (missing file, broken
+JSON, invalid structure, etc.), the application is terminated after logging
+schema problems to stderr. Schema validation happens when the first logger
+instance is created.
 
-If there are **any** problems with the schema (missing file, broken JSON,
-invalid `type` values, conflicting root fields that match system logging
-fields, malformed structure, etc.):
-
-- the logger instance is not created (schema validation happens before
-  the logger is initialized);
-- schema problems are logged to stderr in the format:
-  `"Schema has problems: {problem1}; {problem2}; ..."`;
-- the application is terminated via `os._exit(1)`.
-
-If there are no problems, the schema is compiled and the logger is created.
-A valid empty schema (e.g., `{}` or a schema with only inner nodes and no
-leaves) is treated as valid and does not cause errors. The logger is created
-successfully, but no `extra` fields will be included in log records.
-
-**Note**: System-level errors (OSError, ValueError, RuntimeError) that occur
-during schema compilation are converted to `SchemaProblem` instances and
-handled the same way as schema validation problems - the application is
-terminated after logging the error to stderr.
+A valid empty schema (`{}`) is allowed and will result in no `extra` fields
+being included in log records.
 
 An example schema:
 
@@ -216,44 +175,23 @@ An example of a valid empty schema (no leaves, no problems):
 {}
 ```
 
-An empty schema is valid and does not cause errors. When using an empty schema,
-no `extra` fields will be included in log records, and any attempt to log with
-`extra` fields will result in validation errors being logged as ERROR messages.
+**Schema structure:**
 
-- An inner node is an object without `type` and `source` (neither field is present).
-- A leaf node is an object that has at least one of `type` or `source` fields.
-  However, a valid leaf node must have both `type` and `source` fields. If a
-  leaf node is missing either field or has an empty value, it will be reported
-  as a schema problem during validation.
-- `type` is one of the allowed Python type names: `"str"`, `"int"`, `"float"`,
-  `"bool"`, or `"list"`.
-- For `"list"` type, an additional `item_type` field is required to declare
-  the element type. Only primitive element types (`"str"`, `"int"`, `"float"`,
-  `"bool"`) are allowed. Nested lists and dictionaries are not permitted as
-  list elements.
-- `source` is the name of the field in `extra` from which the value is taken.
+- **Inner nodes**: Objects without `type` and `source` fields (used for nesting).
+- **Leaf nodes**: Objects with both `type` and `source` fields. A valid leaf
+  must have both fields present and non-empty.
+- **`type`**: One of `"str"`, `"int"`, `"float"`, `"bool"`, or `"list"`.
+- **`source`**: The name of the field in `extra` from which the value is taken.
+- **Root key restrictions**: Root keys cannot conflict with standard `logging`
+  module fields (e.g., `name`, `levelno`, `pathname`). Such conflicts cause
+  schema validation to fail.
 
-### Schema root key restrictions
+**List-typed fields:**
 
-- The library protects system fields from the standard `logging` module
-  (attributes of `LogRecord` and logger internals) by preventing their use as
-  root keys in the schema.
-- If a root key in the schema conflicts with a system logging field, a
-  `SchemaProblem` is generated and the schema validation fails.
-- Responsibility for ensuring compatibility with other logging libraries and
-  formatters lies with the developer when writing the schema.
-
-### List-typed fields
-
-When a leaf declares `"type": "list"`, the runtime value must be a Python list
-with **homogeneous primitive elements**. The element type is defined by the
-mandatory `item_type` field:
-
-- Allowed `item_type` values: `"str"`, `"int"`, `"float"`, `"bool"`
-- All elements in the list must have exactly the declared Python type
-  (e.g. `type(item) is int` for `"item_type": "int"`)
-- Empty lists are allowed
-- Nested lists and dictionaries inside the list are not allowed
+For `"type": "list"`, you must also specify `"item_type"` (one of `"str"`,
+`"int"`, `"float"`, `"bool"`). Lists must contain homogeneous primitive elements
+of the declared type. Empty lists are allowed; nested lists and dictionaries are
+not permitted.
 
 Example of a valid list field:
 
@@ -280,39 +218,21 @@ logger.info(
 )
 ```
 
-Example of an invalid list field (non-primitive elements):
+Invalid example (non-primitive elements are rejected):
 
 ```python
-logger.info(
-    "request processed",
-    extra={
-        "tags": [{"key": "color", "value": "blue"}],  # list[dict] – invalid
-    },
-)
+logger.info("request processed", extra={"tags": [{"key": "color"}]})  # Invalid
+# Validation error is logged as ERROR after the log record is emitted
 ```
 
-In this case the `tags` value is rejected, a `DataProblem` is recorded with a
-JSON message containing field, error, and value information.
+**Multiple leaves with the same source:**
 
-And an ERROR message is logged **after** the log record has been emitted with
-the JSON format: `{"validation_errors": [{"field": "...", "error": "...", "value": "..."}]}`.
-All fields are serialized via `repr()` for safety and consistency.
+A single `source` field name can be used in multiple leaves. The value is
+validated independently for each leaf and written to all matching locations.
+If types conflict, the value is written only where the type matches, and
+validation errors are reported for mismatched locations.
 
-### Multiple leaves with the same source
-
-A single `source` field name can be used in multiple leaves of the schema. This
-allows the same value from `extra` to be placed in different locations of the
-output structure.
-
-When a `source` is referenced by multiple leaves:
-
-- The value is validated against each leaf's expected type independently.
-- The value is written only to those leaf locations where the runtime type
-  matches the expected type.
-- For leaf locations where the type does not match, a `DataProblem` is added
-  to the ERROR message that is logged after logging.
-
-Example schema with duplicate source usage:
+Example:
 
 ```json
 {
@@ -325,41 +245,8 @@ Example schema with duplicate source usage:
 }
 ```
 
-In this example, if `extra={"request_id": "abc-123"}`, the value `"abc-123"`
-will be written to both `ServicePayload.RequestID` and `ServicePayload.Metadata.ID`.
+With `extra={"request_id": "abc-123"}`, the value appears in both
+`ServicePayload.RequestID` and `ServicePayload.Metadata.ID`.
 
-If the same `source` is used with conflicting types (e.g., one leaf expects
-`str` and another expects `int`), the value will only be written to locations
-where the type matches, and validation problems will be reported for the
-mismatched locations. It is the schema author's responsibility to ensure
-consistent type expectations when reusing a `source` field.
-
-## Schema caching and thread safety
-
-- The library caches compiled schemas after the first load. The schema is
-  effectively loaded and compiled **once per process** for a given schema path.
-  Subsequent logger instances reuse the cached compiled schema.
-- Schema compilation and cache access are **thread-safe**: multiple threads can
-  safely create `SchemaLogger` instances concurrently without race conditions.
-- **Note**: The library does not provide a mechanism to reload the schema
-  without restarting the application. This is a deliberate design decision to
-  ensure schema consistency throughout the application lifecycle.
-
-## Behaviour when logging data
-
-- Any `extra` provided by the application **never goes directly** into the log.
-- The only way for additional fields to reach the log:
-  1. The field is described as a leaf in the schema (`type` + `source`).
-  2. `extra` contains a value under the given `source` name.
-  3. The runtime type of the value strictly matches the declared Python type
-     (exact type match is used, e.g. `bool` is not accepted where `int` is
-     expected, and vice versa).
-- Fields that do not meet these conditions are simply not included in the final
-  log record (see "Strictness guarantees" above for details on validation
-  error reporting).
-- When a `source` is used in multiple leaves (see "Multiple leaves with the same
-  source" above), the value is validated and written independently for each leaf
-  location.
-- Before emitting the final structured payload, the library strips empty
-  dictionaries and `None` values from nested structures so that only meaningful
-  data appears in the resulting log record.
+**Note**: The schema is compiled once per process and cached. Schema changes
+require an application restart to take effect. The library is thread-safe.
