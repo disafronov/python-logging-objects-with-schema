@@ -257,7 +257,7 @@ def test_schema_logger_handles_oserror_from_getcwd_and_terminates(
     """SchemaLogger should catch OSError from os.getcwd() and terminate.
 
     If os.getcwd() raises OSError (e.g., when CWD is deleted), the exception
-    should be converted to SchemaProblem, logger should be cleaned up from cache,
+    should be converted to _SchemaProblem, logger should be cleaned up from cache,
     and application should be terminated.
     """
     import os
@@ -322,7 +322,7 @@ def test_schema_logger_handles_runtimeerror_from_lock_and_terminates(
     """SchemaLogger should catch RuntimeError from threading locks and terminate.
 
     If a threading lock raises RuntimeError (e.g., deadlock detection),
-    the exception should be converted to SchemaProblem, logger should be cleaned
+    the exception should be converted to _SchemaProblem, logger should be cleaned
     up from cache, and application should be terminated.
     """
     import os
@@ -393,7 +393,7 @@ def test_schema_logger_handles_valueerror_and_terminates(
 
     If ValueError is raised during schema compilation (outside of the
     try-except block in _compile_schema_internal), the exception should be
-    converted to SchemaProblem, logger should be cleaned up from cache,
+    converted to _SchemaProblem, logger should be cleaned up from cache,
     and application should be terminated.
     """
     import os

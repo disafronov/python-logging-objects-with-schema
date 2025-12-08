@@ -6,8 +6,12 @@ from dataclasses import dataclass
 
 
 @dataclass
-class SchemaProblem:
+class _SchemaProblem:
     """Describes a single problem encountered while loading the schema.
+
+    This class is part of the internal implementation and is not considered
+    a public API. Its signature and behaviour may change between releases
+    without preserving backward compatibility.
 
     This class is used to report schema validation errors during schema
     compilation. Schema problems are fatal: if any are detected during
@@ -41,7 +45,7 @@ class DataProblem:
 
     This class is used to report validation errors when applying the compiled
     schema to user-provided ``extra`` fields during logging. Unlike
-    :class:`SchemaProblem`, data problems are not fatal: they are collected
+    :class:`_SchemaProblem`, data problems are not fatal: they are collected
     and logged as ERROR messages *after* the main log record has been emitted,
     ensuring 100% compatibility with standard logger behavior.
 
