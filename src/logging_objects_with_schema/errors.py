@@ -40,8 +40,12 @@ class _SchemaProblem:
 
 
 @dataclass
-class DataProblem:
+class _DataProblem:
     """Describes a single problem encountered while validating log data.
+
+    This class is part of the internal implementation and is not considered
+    a public API. Its signature and behaviour may change between releases
+    without preserving backward compatibility.
 
     This class is used to report validation errors when applying the compiled
     schema to user-provided ``extra`` fields during logging. Unlike

@@ -203,7 +203,7 @@ class SchemaLogger(logging.Logger):
                         stack_info=False, stacklevel=stacklevel + 1
                     )
             # Format error message as JSON for machine processing.
-            # Each DataProblem.message is already a JSON string (created by
+            # Each _DataProblem.message is already a JSON string (created by
             # _create_validation_error_json) with structure:
             #   {"field": "...", "error": "...", "value": "..."}
             # We parse them back to dicts and combine into a single JSON object
@@ -226,7 +226,7 @@ class SchemaLogger(logging.Logger):
                     # create a fallback error object. This should never happen in
                     # normal operation since problem.message is always created via
                     # _create_validation_error_json, but protects against unexpected
-                    # data corruption or manual DataProblem creation. The fallback
+                    # data corruption or manual _DataProblem creation. The fallback
                     # preserves the same structure (field, error, value) for
                     # consistency.
                     validation_errors.append(

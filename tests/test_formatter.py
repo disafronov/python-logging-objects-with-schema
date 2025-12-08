@@ -6,7 +6,7 @@ functionality directly, without going through SchemaLogger.
 
 from __future__ import annotations
 
-from logging_objects_with_schema.errors import DataProblem
+from logging_objects_with_schema.errors import _DataProblem
 from logging_objects_with_schema.schema_applier import (
     _apply_schema_internal as apply_schema_internal,
 )
@@ -656,33 +656,33 @@ def test_validate_list_value_valid_items_returns_none() -> None:
 
 
 def test_validate_list_value_mixed_types_returns_problem() -> None:
-    """validate_list_value should return DataProblem for mixed types."""
+    """validate_list_value should return _DataProblem for mixed types."""
     result = validate_list_value([1, "two", 3], "test_field", int)
-    assert isinstance(result, DataProblem)
+    assert isinstance(result, _DataProblem)
     assert "test_field" in result.message
     assert "str" in result.message
     assert "expected all elements to be of type int" in result.message
 
 
 def test_validate_list_value_none_item_type_returns_problem() -> None:
-    """validate_list_value should return DataProblem when item_expected_type is None."""
+    """validate_list_value should return _DataProblem when item_expected_type is None."""  # noqa: E501
     result = validate_list_value([1, 2, 3], "test_field", None)
-    assert isinstance(result, DataProblem)
+    assert isinstance(result, _DataProblem)
     assert "test_field" in result.message
     assert "no item type configured" in result.message
 
 
 def test_validate_list_value_nested_list_returns_problem() -> None:
-    """validate_list_value should return DataProblem for nested lists."""
+    """validate_list_value should return _DataProblem for nested lists."""
     result = validate_list_value([1, [2, 3], 4], "test_field", int)
-    assert isinstance(result, DataProblem)
+    assert isinstance(result, _DataProblem)
     assert "list" in result.message.lower()
 
 
 def test_validate_list_value_dict_in_list_returns_problem() -> None:
-    """validate_list_value should return DataProblem for dicts in list."""
+    """validate_list_value should return _DataProblem for dicts in list."""
     result = validate_list_value([1, {"key": "value"}, 3], "test_field", int)
-    assert isinstance(result, DataProblem)
+    assert isinstance(result, _DataProblem)
     assert "dict" in result.message.lower()
 
 
