@@ -14,7 +14,7 @@ import pytest
 from conftest import _write_schema
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
+from logging_objects_with_schema.schema_loader import _SCHEMA_FILE_NAME
 
 
 def test_multiple_logger_instances_share_schema(
@@ -371,7 +371,7 @@ def test_schema_file_permission_error_terminates_application(
         },
     )
 
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     original_open = schema_loader.Path.open  # type: ignore[attr-defined]
 
     def fake_open(self, *args, **kwargs):  # type: ignore[override]

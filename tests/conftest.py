@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import schema_loader
-from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
+from logging_objects_with_schema.schema_loader import _SCHEMA_FILE_NAME
 
 
 @pytest.fixture(autouse=True)
@@ -30,5 +30,5 @@ def _write_schema(tmp_path: Path, data: dict) -> None:
         tmp_path: Temporary directory path.
         data: Schema data to write as JSON.
     """
-    schema_path = tmp_path / SCHEMA_FILE_NAME
+    schema_path = tmp_path / _SCHEMA_FILE_NAME
     schema_path.write_text(json.dumps(data), encoding="utf-8")

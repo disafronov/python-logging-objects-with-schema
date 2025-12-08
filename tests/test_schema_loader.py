@@ -15,8 +15,8 @@ from conftest import _write_schema
 import logging_objects_with_schema.schema_loader as schema_loader
 from logging_objects_with_schema.errors import _SchemaProblem
 from logging_objects_with_schema.schema_loader import (
+    _SCHEMA_FILE_NAME,
     MAX_SCHEMA_DEPTH,
-    SCHEMA_FILE_NAME,
 )
 from logging_objects_with_schema.schema_loader import (
     _cache_and_return_found_path as cache_and_return_found_path,
@@ -434,7 +434,7 @@ def test_find_schema_file_searches_upward(
     # Should find schema file in root
     found_path = _find_schema_file()
     assert found_path is not None
-    assert found_path == (root_dir / SCHEMA_FILE_NAME).resolve()
+    assert found_path == (root_dir / _SCHEMA_FILE_NAME).resolve()
     assert found_path.exists()
 
 
@@ -477,7 +477,7 @@ def test_schema_file_os_error_produces_problem_and_empty_schema(
         },
     )
 
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     original_open = schema_loader.Path.open  # type: ignore[attr-defined]
 
     def fake_open(self, *args, **kwargs):  # type: ignore[override]
@@ -906,7 +906,7 @@ def test_get_schema_path_cached_file_deleted_re_searches(
 
     # Second call - should re-search and return path in current directory
     path2 = get_schema_path()
-    assert path2 == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert path2 == (tmp_path / _SCHEMA_FILE_NAME).resolve()
     assert not path2.exists()
 
 
@@ -925,13 +925,13 @@ def test_get_schema_path_cwd_change_invalidates_cache_when_file_not_found(
     # Start in dir1 (no schema file)
     monkeypatch.chdir(dir1)
     path1 = get_schema_path()
-    assert path1 == (dir1 / SCHEMA_FILE_NAME).resolve()
+    assert path1 == (dir1 / _SCHEMA_FILE_NAME).resolve()
     assert not path1.exists()
 
     # Change to dir2 (still no schema file, but different path expected)
     monkeypatch.chdir(dir2)
     path2 = get_schema_path()
-    assert path2 == (dir2 / SCHEMA_FILE_NAME).resolve()
+    assert path2 == (dir2 / _SCHEMA_FILE_NAME).resolve()
     assert path2 != path1
 
 
@@ -955,7 +955,7 @@ def test_get_schema_path_cwd_change_preserves_cache_when_file_found(
     monkeypatch.chdir(sub_dir)
     path1 = get_schema_path()
     assert path1.exists()
-    assert path1 == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert path1 == (tmp_path / _SCHEMA_FILE_NAME).resolve()
 
     # Change to another subdirectory
     sub_dir2 = tmp_path / "subdir2"
@@ -977,7 +977,7 @@ def test_check_cached_found_file_path_returns_path_when_exists(
     monkeypatch.chdir(tmp_path)
 
     # Create schema file
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     _write_schema(
         tmp_path,
         {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
@@ -1003,7 +1003,7 @@ def test_check_cached_found_file_path_returns_none_when_file_deleted(
     monkeypatch.chdir(tmp_path)
 
     # Create and cache schema file
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     _write_schema(
         tmp_path,
         {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
@@ -1040,7 +1040,7 @@ def test_check_cached_missing_file_path_returns_path_when_cwd_unchanged(
 
     monkeypatch.chdir(tmp_path)
 
-    expected_path = (tmp_path / SCHEMA_FILE_NAME).resolve()
+    expected_path = (tmp_path / _SCHEMA_FILE_NAME).resolve()
 
     with schema_loader._path_cache_lock:
         schema_loader._resolved_schema_path = expected_path
@@ -1064,7 +1064,7 @@ def test_check_cached_missing_file_path_returns_none_when_cwd_changed(
     monkeypatch.chdir(dir1)
 
     with schema_loader._path_cache_lock:
-        schema_loader._resolved_schema_path = (dir1 / SCHEMA_FILE_NAME).resolve()
+        schema_loader._resolved_schema_path = (dir1 / _SCHEMA_FILE_NAME).resolve()
         schema_loader._cached_cwd = dir1.resolve()
 
         # Change CWD
@@ -1096,7 +1096,7 @@ def test_cache_and_return_found_path_caches_path(
 
     monkeypatch.chdir(tmp_path)
 
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     _write_schema(
         tmp_path,
         {"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}},
@@ -1118,7 +1118,7 @@ def test_cache_and_return_missing_path_caches_path(
 
     monkeypatch.chdir(tmp_path)
 
-    expected_path = (tmp_path / SCHEMA_FILE_NAME).resolve()
+    expected_path = (tmp_path / _SCHEMA_FILE_NAME).resolve()
 
     with schema_loader._path_cache_lock:
         result = cache_and_return_missing_path()
@@ -1208,7 +1208,7 @@ def test_load_raw_schema_loads_valid_schema(
 
     assert isinstance(data, dict)
     assert data == schema_data
-    assert returned_schema_path == (tmp_path / SCHEMA_FILE_NAME).resolve()
+    assert returned_schema_path == (tmp_path / _SCHEMA_FILE_NAME).resolve()
     assert returned_schema_path.exists()
 
 
@@ -1224,7 +1224,7 @@ def test_load_raw_schema_raises_file_not_found_when_missing(
         load_raw_schema(schema_path)
 
     assert "Schema file not found" in str(exc_info.value)
-    assert SCHEMA_FILE_NAME in str(exc_info.value)
+    assert _SCHEMA_FILE_NAME in str(exc_info.value)
 
 
 def test_load_raw_schema_raises_value_error_for_invalid_json(
@@ -1233,7 +1233,7 @@ def test_load_raw_schema_raises_value_error_for_invalid_json(
 ) -> None:
     """_load_raw_schema should raise ValueError for invalid JSON."""
     monkeypatch.chdir(tmp_path)
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     schema_file.write_text("{ invalid json }", encoding="utf-8")
 
     schema_path = get_schema_path()
@@ -1249,7 +1249,7 @@ def test_load_raw_schema_raises_value_error_for_non_object(
 ) -> None:
     """_load_raw_schema should raise ValueError when top-level is not an object."""
     monkeypatch.chdir(tmp_path)
-    schema_file = tmp_path / SCHEMA_FILE_NAME
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
     # Write a JSON array instead of an object
     schema_file.write_text('["not", "an", "object"]', encoding="utf-8")
 
