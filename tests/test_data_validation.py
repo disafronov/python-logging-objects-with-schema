@@ -8,10 +8,10 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
-from conftest import _write_schema
 
 from logging_objects_with_schema import SchemaLogger
 from logging_objects_with_schema.schema_loader import _SCHEMA_FILE_NAME
+from tests.helpers import _write_schema
 
 
 def _configure_schema_logger(stream: StringIO) -> SchemaLogger:
