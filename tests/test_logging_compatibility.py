@@ -74,7 +74,7 @@ def test_schema_logger_reports_correct_caller_location(
     output = stream.getvalue().strip()
     assert "hello from test" in output
     # The reported pathname should point to this test module, not schema_logger.py.
-    assert output.split(":", 1)[0].endswith("test__schema_logger_mimic.py")
+    assert output.split(":", 1)[0].endswith("test_logging_compatibility.py")
 
 
 def test_schema_logger_works_with_setloggerclass(
