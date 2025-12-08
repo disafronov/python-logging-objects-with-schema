@@ -30,7 +30,11 @@
         ["@semantic-release/changelog", {}],
         ["@semantic-release/git", {
             "assets": ["CHANGELOG.md", "pyproject.toml", "uv.lock"],
-            "message": `chore(release): \${nextRelease.version}\n\n\${nextRelease.notes}\n\nSigned-off-by: ${process.env.GIT_AUTHOR_NAME || process.env.GIT_COMMITTER_NAME || "Release Bot"} <${process.env.GIT_AUTHOR_EMAIL || process.env.GIT_COMMITTER_EMAIL || "noreply@github.com"}>`
+            "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}\n\nSigned-off-by: " +
+            (process.env.GIT_AUTHOR_NAME || process.env.GIT_COMMITTER_NAME || "Release Bot") +
+            " <" +
+            (process.env.GIT_AUTHOR_EMAIL || process.env.GIT_COMMITTER_EMAIL || "noreply@github.com") +
+            ">"
         }],
         ["@semantic-release/github", {}]
     ]
