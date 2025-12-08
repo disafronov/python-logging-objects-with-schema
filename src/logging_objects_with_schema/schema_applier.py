@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
-from .errors import DataProblem
+from .errors import _DataProblem
 from .schema_loader import _CompiledSchema, _SchemaLeaf
 
 
@@ -45,7 +45,7 @@ def _validate_list_value(
     value: list,
     source: str,
     item_expected_type: type | None,
-) -> DataProblem | None:
+) -> _DataProblem | None:
     """Validate that a list value matches the expected item type.
 
     Validates that all elements in the list have the exact type declared by
@@ -58,11 +58,11 @@ def _validate_list_value(
             for list-typed leaves.
 
     Returns:
-        DataProblem if validation fails, None if validation succeeds.
+        _DataProblem if validation fails, None if validation succeeds.
     """
     if item_expected_type is None:
         error_msg = "is a list but has no item type configured"
-        return DataProblem(_create_validation_error_json(source, error_msg, value))
+        return _DataProblem(_create_validation_error_json(source, error_msg, value))
 
     if len(value) == 0:
         # Empty lists are always valid
@@ -83,7 +83,7 @@ def _validate_list_value(
             f"expected all elements to be of type "
             f"{item_expected_type.__name__}"
         )
-        return DataProblem(_create_validation_error_json(source, error_msg, value))
+        return _DataProblem(_create_validation_error_json(source, error_msg, value))
 
     return None
 
@@ -128,7 +128,7 @@ def _validate_and_apply_leaf(
     value: Any,
     source: str,
     extra: MutableMapping[str, Any],
-    problems: list[DataProblem],
+    problems: list[_DataProblem],
 ) -> None:
     """Validate a value against a schema leaf and apply it if valid.
 
@@ -152,7 +152,7 @@ def _validate_and_apply_leaf(
             f"expected {leaf.expected_type.__name__}"
         )
         problems.append(
-            DataProblem(_create_validation_error_json(source, error_msg, value))
+            _DataProblem(_create_validation_error_json(source, error_msg, value))
         )
         return
 
@@ -205,7 +205,7 @@ def _strip_empty(node: Any) -> Any:
 def _apply_schema_internal(
     compiled: _CompiledSchema,
     extra_values: Mapping[str, Any],
-) -> tuple[dict[str, Any], list[DataProblem]]:
+) -> tuple[dict[str, Any], list[_DataProblem]]:
     """Internal function to build structured ``extra`` from compiled schema.
 
     The function applies a :class:`_CompiledSchema` to user-provided ``extra``
@@ -213,17 +213,17 @@ def _apply_schema_internal(
 
     - ``structured_extra`` is a nested dictionary that follows the schema
       structure and contains only fields that passed validation;
-    - ``problems`` is a list of :class:`DataProblem` describing all data
+    - ``problems`` is a list of :class:`_DataProblem` describing all data
       issues observed during processing.
 
     Behaviour summary:
 
     - If the compiled schema is effectively empty (no valid leaves),
       all fields from ``extra_values`` are treated as redundant: the returned
-      payload is empty, and a :class:`DataProblem` is created for each field.
+      payload is empty, and a :class:`_DataProblem` is created for each field.
     - For each ``source`` mentioned in the schema when there are valid leaves:
       - if the source is missing from ``extra_values``, it is silently skipped;
-      - if the corresponding value is ``None``, a ``DataProblem`` is recorded
+      - if the corresponding value is ``None``, a ``_DataProblem`` is recorded
         and the value is not written to the payload.
     - Type checks are strict: the runtime type must exactly match the declared
       Python type (``type(value) is leaf.expected_type``). This prevents
@@ -233,17 +233,17 @@ def _apply_schema_internal(
       - all elements must have the exact type declared by the leaf
         ``item_expected_type`` (for example, list[str], list[int]);
       - non-primitive elements and elements of a different primitive type are
-        rejected with a ``DataProblem`` and the list value is not written.
+        rejected with a ``_DataProblem`` and the list value is not written.
     - Redundant fields from ``extra_values`` (not referenced by any leaf
       ``source``) are always reported as problems: each such field generates
-      a :class:`DataProblem` indicating that it is not defined in the schema.
+      a :class:`_DataProblem` indicating that it is not defined in the schema.
     - A single ``source`` may be used by multiple leaves. The value is
       validated independently for each leaf and written only to locations
-      where the type matches; mismatched locations produce ``DataProblem``
+      where the type matches; mismatched locations produce ``_DataProblem``
       entries, but do not affect successful locations.
 
     The function itself does not raise exceptions; it only accumulates
-    :class:`DataProblem` instances for the caller to handle.
+    :class:`_DataProblem` instances for the caller to handle.
 
     Performance considerations:
         Time complexity is O(n + m) where n is the number of leaves in the
@@ -269,10 +269,10 @@ def _apply_schema_internal(
         change between releases without preserving backward compatibility.
 
     Returns:
-        Tuple of (structured_extra, list[DataProblem]).
+        Tuple of (structured_extra, list[_DataProblem]).
     """
     extra: dict[str, Any] = {}
-    problems: list[DataProblem] = []
+    problems: list[_DataProblem] = []
 
     # Group leaves by source field name. This is necessary because a single source
     # can be referenced by multiple leaves (allowing the same value to appear in
@@ -304,7 +304,7 @@ def _apply_schema_internal(
         if value is None:
             error_msg = "is None"
             problems.append(
-                DataProblem(_create_validation_error_json(source, error_msg, None))
+                _DataProblem(_create_validation_error_json(source, error_msg, None))
             )
             continue
 
@@ -329,7 +329,7 @@ def _apply_schema_internal(
     for key in redundant_keys:
         error_msg = "is not defined in schema"
         problems.append(
-            DataProblem(
+            _DataProblem(
                 _create_validation_error_json(key, error_msg, extra_values[key])
             )
         )
