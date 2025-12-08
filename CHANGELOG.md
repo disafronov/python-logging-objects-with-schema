@@ -1,3 +1,9 @@
+## [0.1.4](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.1.3...v0.1.4) (2025-12-08)
+
+### Bug Fixes
+
+* **schema_loader:** improve caching logic for missing schema file paths ([eab9bac](https://github.com/disafronov/python-logging-objects-with-schema/commit/eab9bac07caf185ec2e1043133b7b819526abf18))
+
 ## [0.1.4-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.1.3...v0.1.4-rc.1) (2025-12-08)
 
 ### Bug Fixes
