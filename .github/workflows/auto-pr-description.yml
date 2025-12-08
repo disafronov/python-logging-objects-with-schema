@@ -28,7 +28,7 @@ jobs:
           api_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Force overwrite PR title and body
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           PR_BODY: ${{ steps.gen.outputs.pull_request_description }}
         with:
