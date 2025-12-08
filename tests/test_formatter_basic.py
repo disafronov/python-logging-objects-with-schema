@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from logging_objects_with_schema import SchemaLogger
-from logging_objects_with_schema.schema_loader import SCHEMA_FILE_NAME
+from logging_objects_with_schema.schema_loader import _SCHEMA_FILE_NAME
 
 
 def _configure_schema_logger(stream: StringIO) -> SchemaLogger:
@@ -32,7 +32,7 @@ def test_schema_logger_type_mismatch_logs_error_after_logging(
 
     monkeypatch.chdir(tmp_path)
 
-    schema_path = tmp_path / SCHEMA_FILE_NAME
+    schema_path = tmp_path / _SCHEMA_FILE_NAME
     schema_path.write_text(
         json.dumps(
             {
@@ -75,7 +75,7 @@ def test_schema_logger_valid_data_appears_in_log(
 
     monkeypatch.chdir(tmp_path)
 
-    schema_path = tmp_path / SCHEMA_FILE_NAME
+    schema_path = tmp_path / _SCHEMA_FILE_NAME
     schema_path.write_text(
         json.dumps(
             {
@@ -115,7 +115,7 @@ def test_validation_error_record_has_function_name(
 
     monkeypatch.chdir(tmp_path)
 
-    schema_path = tmp_path / SCHEMA_FILE_NAME
+    schema_path = tmp_path / _SCHEMA_FILE_NAME
     schema_path.write_text(
         json.dumps(
             {

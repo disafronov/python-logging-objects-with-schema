@@ -20,7 +20,7 @@ from typing import Any
 
 from .errors import _SchemaProblem
 
-SCHEMA_FILE_NAME = "logging_objects_with_schema.json"
+_SCHEMA_FILE_NAME = "logging_objects_with_schema.json"
 
 # Maximum allowed depth for schema nesting (protection against DoS)
 MAX_SCHEMA_DEPTH = 100
@@ -143,7 +143,7 @@ def _find_schema_file() -> Path | None:
     current = start_path
 
     while True:
-        schema_path = current / SCHEMA_FILE_NAME
+        schema_path = current / _SCHEMA_FILE_NAME
         if schema_path.exists():
             # Use resolve() to get an absolute path and resolve any symbolic links.
             # This ensures we have a canonical path that can be used as a cache key
@@ -247,7 +247,7 @@ def _cache_and_return_missing_path() -> Path:
     global _resolved_schema_path, _cached_cwd
 
     current_cwd = _get_current_working_directory()
-    schema_path = (current_cwd / SCHEMA_FILE_NAME).resolve()
+    schema_path = (current_cwd / _SCHEMA_FILE_NAME).resolve()
     _resolved_schema_path = schema_path
     _cached_cwd = current_cwd  # Track CWD since path depends on it
     return schema_path
@@ -256,7 +256,7 @@ def _cache_and_return_missing_path() -> Path:
 def _get_schema_path() -> Path:
     """Resolve the absolute path to the JSON schema file with caching semantics.
 
-    The function searches for ``SCHEMA_FILE_NAME`` by walking upward from the
+    The function searches for ``_SCHEMA_FILE_NAME`` by walking upward from the
     current working directory and caches the result:
 
     - When the schema file is found, its absolute path is cached as
