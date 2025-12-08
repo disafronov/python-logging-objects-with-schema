@@ -686,9 +686,9 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     """
     schema_path = _get_schema_path()
 
-    # Fast-path: First check (without holding lock) if we have already attempted
-    # to compile schema for this path. This avoids lock contention in the common
-    # case when the schema is already cached.
+    # Fast-path: First check (with lock for thread-safety) if we have already attempted
+    # to compile schema for this path. This provides thread-safe cache access
+    # in the common case when the schema is already cached.
     with _cache_lock:
         cached = _SCHEMA_CACHE.get(schema_path)
     if cached is not None:
