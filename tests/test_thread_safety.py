@@ -7,9 +7,9 @@ import threading
 from pathlib import Path
 
 import pytest
-from conftest import _write_schema
 
 from logging_objects_with_schema import SchemaLogger
+from tests.helpers import _write_schema
 
 
 def test_concurrent_logger_creation(
