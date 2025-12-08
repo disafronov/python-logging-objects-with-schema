@@ -6,9 +6,14 @@ functionality directly, without going through SchemaLogger.
 
 from __future__ import annotations
 
+import json
+
 from logging_objects_with_schema.errors import _DataProblem
 from logging_objects_with_schema.schema_applier import (
     _apply_schema_internal as apply_schema_internal,
+)
+from logging_objects_with_schema.schema_applier import (
+    _create_validation_error_json as create_validation_error_json,
 )
 from logging_objects_with_schema.schema_applier import (
     _set_nested_value as set_nested_value,
@@ -822,3 +827,145 @@ def test_validate_and_apply_leaf_list_without_item_type() -> None:
     assert len(problems) == 1
     assert "no item type configured" in problems[0].message
     assert extra == {}
+
+
+# Tests for _create_validation_error_json helper function
+
+
+def test_create_validation_error_json_with_string() -> None:
+    """_create_validation_error_json should create valid JSON with string value."""
+    result = create_validation_error_json("user_id", "expected int", "abc-123")
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'user_id'"
+    assert parsed["error"] == "'expected int'"
+    assert parsed["value"] == "'abc-123'"
+
+
+def test_create_validation_error_json_with_int() -> None:
+    """_create_validation_error_json should use repr() for int values."""
+    result = create_validation_error_json("count", "expected str", 42)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'count'"
+    assert parsed["error"] == "'expected str'"
+    assert parsed["value"] == "42"
+
+
+def test_create_validation_error_json_with_float() -> None:
+    """_create_validation_error_json should use repr() for float values."""
+    result = create_validation_error_json("price", "expected int", 3.14)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'price'"
+    assert parsed["error"] == "'expected int'"
+    assert parsed["value"] == "3.14"
+
+
+def test_create_validation_error_json_with_bool() -> None:
+    """_create_validation_error_json should use repr() for bool values."""
+    result = create_validation_error_json("is_active", "expected int", True)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'is_active'"
+    assert parsed["error"] == "'expected int'"
+    assert parsed["value"] == "True"
+
+
+def test_create_validation_error_json_with_none() -> None:
+    """_create_validation_error_json should use repr() for None value."""
+    result = create_validation_error_json("user_id", "is None", None)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'user_id'"
+    assert parsed["error"] == "'is None'"
+    assert parsed["value"] == "None"
+
+
+def test_create_validation_error_json_with_dict() -> None:
+    """_create_validation_error_json should use repr() for dict values."""
+    dict_value = {"key": "value", "nested": {"inner": 42}}
+    result = create_validation_error_json("tags", "invalid type", dict_value)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'tags'"
+    assert parsed["error"] == "'invalid type'"
+    # Value should be the repr() string representation
+    assert isinstance(parsed["value"], str)
+    assert "key" in parsed["value"]
+    assert "value" in parsed["value"]
+
+
+def test_create_validation_error_json_with_list() -> None:
+    """_create_validation_error_json should use repr() for list values."""
+    list_value = [1, 2, "three", {"key": "value"}]
+    result = create_validation_error_json("items", "invalid type", list_value)
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'items'"
+    assert parsed["error"] == "'invalid type'"
+    # Value should be the repr() string representation
+    assert isinstance(parsed["value"], str)
+    assert "1" in parsed["value"]
+    assert "2" in parsed["value"]
+
+
+def test_create_validation_error_json_returns_valid_json() -> None:
+    """_create_validation_error_json should return valid JSON string."""
+    result = create_validation_error_json("field", "error", "value")
+
+    # Should not raise exception
+    parsed = json.loads(result)
+    assert isinstance(parsed, dict)
+    assert "field" in parsed
+    assert "error" in parsed
+    assert "value" in parsed
+
+
+def test_create_validation_error_json_all_values_wrapped_in_repr() -> None:
+    """_create_validation_error_json should wrap all values in repr()."""
+    result = create_validation_error_json("test_field", "test error", "test value")
+
+    parsed = json.loads(result)
+    # All values should be strings (wrapped in repr())
+    assert isinstance(parsed["field"], str)
+    assert isinstance(parsed["error"], str)
+    assert isinstance(parsed["value"], str)
+    # Field and error should have quotes (repr() of strings)
+    assert parsed["field"].startswith("'")
+    assert parsed["field"].endswith("'")
+    assert parsed["error"].startswith("'")
+    assert parsed["error"].endswith("'")
+
+
+def test_create_validation_error_json_with_special_characters() -> None:
+    """_create_validation_error_json should handle special characters via repr()."""
+    special_value = "value with\nnewline\tand\ttab"
+    result = create_validation_error_json("field", "error", special_value)
+
+    parsed = json.loads(result)
+    # repr() should escape special characters
+    assert "\\n" in parsed["value"] or "\n" in parsed["value"]
+    assert "\\t" in parsed["value"] or "\t" in parsed["value"]
+
+
+def test_create_validation_error_json_with_unicode() -> None:
+    """_create_validation_error_json should handle unicode characters via repr()."""
+    unicode_value = "тест 测试 🚀"
+    result = create_validation_error_json("field", "error", unicode_value)
+
+    parsed = json.loads(result)
+    # Should be valid JSON with unicode preserved
+    assert (
+        "тест" in parsed["value"] or "\\u0442\\u0435\\u0441\\u0442" in parsed["value"]
+    )
+
+
+def test_create_validation_error_json_with_empty_string() -> None:
+    """_create_validation_error_json should handle empty string value."""
+    result = create_validation_error_json("field", "error", "")
+
+    parsed = json.loads(result)
+    assert parsed["field"] == "'field'"
+    assert parsed["error"] == "'error'"
+    assert parsed["value"] == "''"
