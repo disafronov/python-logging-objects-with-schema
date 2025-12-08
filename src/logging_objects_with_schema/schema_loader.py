@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .errors import SchemaProblem
+from .errors import _SchemaProblem
 
 SCHEMA_FILE_NAME = "logging_objects_with_schema.json"
 
@@ -67,8 +67,8 @@ class _CompiledSchema:
 
 
 def _create_empty_compiled_schema_with_problems(
-    problems: list[SchemaProblem],
-) -> tuple[_CompiledSchema, list[SchemaProblem]]:
+    problems: list[_SchemaProblem],
+) -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     """Create an empty _CompiledSchema with problems.
 
     Args:
@@ -110,9 +110,9 @@ _TYPE_MAP: Mapping[str, type] = {
 # use double-checked locking to avoid race conditions.
 
 # Compiled schema cache: Key is absolute schema_path, Value is tuple of
-# (_CompiledSchema, list[SchemaProblem]). This cache stores both successful
+# (_CompiledSchema, list[_SchemaProblem]). This cache stores both successful
 # compilations and failures (with problems list).
-_SCHEMA_CACHE: dict[Path, tuple[_CompiledSchema, list[SchemaProblem]]] = {}
+_SCHEMA_CACHE: dict[Path, tuple[_CompiledSchema, list[_SchemaProblem]]] = {}
 
 _cache_lock = threading.RLock()
 
@@ -300,7 +300,7 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
     This function attempts to read and parse the schema file. If any problems
     occur (file not found, I/O errors, invalid JSON, wrong top-level type),
     it raises exceptions (FileNotFoundError or ValueError). These exceptions
-    are then converted to :class:`SchemaProblem` instances by the caller
+    are then converted to :class:`_SchemaProblem` instances by the caller
     (_compile_schema_internal).
 
     Args:
@@ -328,7 +328,7 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
     except OSError as exc:
         # Normalise I/O errors when reading the schema file (e.g., permission
         # denied, file not found) to ValueError so that _compile_schema_internal()
-        # can report them as SchemaProblem instances instead of leaking raw
+        # can report them as _SchemaProblem instances instead of leaking raw
         # OSError to callers. Note: System-level OSError (e.g., from os.getcwd())
         # is not caught here and propagates directly.
         raise ValueError(
@@ -339,7 +339,7 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
 
     if not isinstance(data, dict):
         # Normalise non-object top-level schemas into a ValueError so that the
-        # caller can report it as a SchemaProblem while keeping type safety.
+        # caller can report it as a _SchemaProblem while keeping type safety.
         raise ValueError("Top-level schema must be a JSON object")
 
     return data, schema_path
@@ -401,7 +401,7 @@ def _validate_and_create_leaf(
     value_dict: dict[str, Any],
     path: tuple[str, ...],
     key: str,
-    problems: list[SchemaProblem],
+    problems: list[_SchemaProblem],
 ) -> _SchemaLeaf | None:
     """Validate a leaf node and create _SchemaLeaf if valid.
 
@@ -423,7 +423,7 @@ def _validate_and_create_leaf(
 
     if type_invalid:
         problems.append(
-            SchemaProblem(
+            _SchemaProblem(
                 f"Incomplete leaf at {_format_path(path, key)}: "
                 f"type cannot be None or empty",
             ),
@@ -431,7 +431,7 @@ def _validate_and_create_leaf(
 
     if source_invalid:
         problems.append(
-            SchemaProblem(
+            _SchemaProblem(
                 f"Incomplete leaf at {_format_path(path, key)}: "
                 f"source cannot be None or empty",
             ),
@@ -446,7 +446,7 @@ def _validate_and_create_leaf(
     expected_type = _TYPE_MAP.get(str(leaf_type))
     if expected_type is None:
         problems.append(
-            SchemaProblem(
+            _SchemaProblem(
                 f"Unknown type '{leaf_type}' at {_format_path(path, key)}",
             ),
         )
@@ -460,7 +460,7 @@ def _validate_and_create_leaf(
         item_type_invalid = _is_empty_or_none(item_type_name)
         if item_type_invalid:
             problems.append(
-                SchemaProblem(
+                _SchemaProblem(
                     f"Incomplete leaf at {_format_path(path, key)}: "
                     f"item_type is required for list type and "
                     f"cannot be None or empty",
@@ -472,7 +472,7 @@ def _validate_and_create_leaf(
         # Item type must be a primitive (str, int, float, bool), not list
         if item_expected_type is None or item_expected_type is list:
             problems.append(
-                SchemaProblem(
+                _SchemaProblem(
                     f"Invalid item_type '{item_type_name}' at "
                     f"{_format_path(path, key)}: only primitive item types "
                     f"('str', 'int', 'float', 'bool') are allowed for lists",
@@ -494,7 +494,7 @@ def _validate_and_create_leaf(
 def _compile_schema_tree(
     node: MutableMapping[str, Any],
     path: tuple[str, ...],
-    problems: list[SchemaProblem],
+    problems: list[_SchemaProblem],
 ) -> Iterable[_SchemaLeaf]:
     """Recursively compile a schema node into _SchemaLeaf objects.
 
@@ -529,7 +529,7 @@ def _compile_schema_tree(
     # and to provide clear error messages about the problematic path.
     if len(path) > MAX_SCHEMA_DEPTH:
         problems.append(
-            SchemaProblem(
+            _SchemaProblem(
                 f"Schema nesting depth exceeds maximum allowed depth of "
                 f"{MAX_SCHEMA_DEPTH} at path {_format_path(path)}"
             ),
@@ -539,7 +539,7 @@ def _compile_schema_tree(
     for key, value in node.items():
         if not isinstance(value, Mapping):
             problems.append(
-                SchemaProblem(
+                _SchemaProblem(
                     f"Invalid schema at {_format_path(path, key)}: expected object"
                 ),
             )
@@ -617,7 +617,7 @@ def get_builtin_logrecord_attributes() -> set[str]:
 
 
 def _check_root_conflicts(
-    schema_dict: Mapping[str, Any], problems: list[SchemaProblem]
+    schema_dict: Mapping[str, Any], problems: list[_SchemaProblem]
 ) -> None:
     """Check schema root keys for conflicts with reserved logging fields."""
 
@@ -626,23 +626,23 @@ def _check_root_conflicts(
     for key in schema_dict.keys():
         if key in forbidden_root_keys:
             problems.append(
-                SchemaProblem(
+                _SchemaProblem(
                     f"Root key '{key}' conflicts with reserved logging fields",
                 ),
             )
 
 
-def _compile_schema_internal() -> tuple[_CompiledSchema, list[SchemaProblem]]:
+def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     """Compile JSON schema into ``_CompiledSchema`` and collect all problems.
 
     The function loads the raw JSON schema, validates its structure, checks
     root keys for conflicts with reserved ``logging.LogRecord`` attributes
     and compiles all valid leaves into a :class:`_CompiledSchema`. All issues
-    discovered during this process are reported as :class:`SchemaProblem`
+    discovered during this process are reported as :class:`_SchemaProblem`
     instances.
 
     Results are cached process-wide: the cache key is the absolute schema
-    file path and the value is a tuple ``(_CompiledSchema, list[SchemaProblem])``.
+    file path and the value is a tuple ``(_CompiledSchema, list[_SchemaProblem])``.
     Once a schema for a given path has been observed (including the cases when
     it is missing or invalid), subsequent calls always return the cached result
     without re-reading or re-compiling the schema. To pick up on-disk changes
@@ -674,7 +674,7 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[SchemaProblem]]:
         between releases without preserving backward compatibility.
 
     Returns:
-        Tuple of (_CompiledSchema, list[SchemaProblem]).
+        Tuple of (_CompiledSchema, list[_SchemaProblem]).
     """
     schema_path = _get_schema_path()
 
@@ -693,12 +693,12 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[SchemaProblem]]:
     # while holding the lock. If another thread already compiled it, we use that
     # result instead of storing our own (which might be different if the file changed).
 
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
 
     try:
         raw_schema, _ = _load_raw_schema(schema_path)
     except (FileNotFoundError, ValueError) as exc:
-        problems.append(SchemaProblem(str(exc)))
+        problems.append(_SchemaProblem(str(exc)))
         result = _create_empty_compiled_schema_with_problems(problems)
         # Double-checked locking: Check cache again while holding lock. Another
         # thread might have compiled the schema (or handled the same error) while
@@ -721,7 +721,7 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[SchemaProblem]]:
     for key, value in raw_schema.items():
         if not isinstance(value, Mapping):
             problems.append(
-                SchemaProblem(f"Invalid schema at {key}: expected object"),
+                _SchemaProblem(f"Invalid schema at {key}: expected object"),
             )
             continue
 

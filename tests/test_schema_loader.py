@@ -13,7 +13,7 @@ import pytest
 from conftest import _write_schema
 
 import logging_objects_with_schema.schema_loader as schema_loader
-from logging_objects_with_schema.errors import SchemaProblem
+from logging_objects_with_schema.errors import _SchemaProblem
 from logging_objects_with_schema.schema_loader import (
     MAX_SCHEMA_DEPTH,
     SCHEMA_FILE_NAME,
@@ -129,7 +129,7 @@ def test_root_key_conflicting_with_logging_field_produces_problem(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Root key conflicting with logging.LogRecord field produces SchemaProblem."""
+    """Root key conflicting with logging.LogRecord field produces _SchemaProblem."""
 
     monkeypatch.chdir(tmp_path)
     # Use a known LogRecord attribute like "name" or "levelno"
@@ -622,7 +622,7 @@ def test_is_empty_or_none_with_non_string_types() -> None:
 
 def test_validate_and_create_leaf_valid_primitive() -> None:
     """_validate_and_create_leaf should create _SchemaLeaf for valid primitive type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "str", "source": "request_id"}
 
     leaf = validate_and_create_leaf(
@@ -640,7 +640,7 @@ def test_validate_and_create_leaf_valid_primitive() -> None:
 
 def test_validate_and_create_leaf_valid_list_type() -> None:
     """_validate_and_create_leaf should create _SchemaLeaf for valid list type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags", "item_type": "str"}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
@@ -656,7 +656,7 @@ def test_validate_and_create_leaf_valid_list_type() -> None:
 
 def test_validate_and_create_leaf_missing_type() -> None:
     """_validate_and_create_leaf should return None and add problem for missing type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"source": "request_id"}
 
     leaf = validate_and_create_leaf(
@@ -670,7 +670,7 @@ def test_validate_and_create_leaf_missing_type() -> None:
 
 def test_validate_and_create_leaf_missing_source() -> None:
     """_validate_and_create_leaf should return None for missing source."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "str"}
 
     leaf = validate_and_create_leaf(
@@ -684,7 +684,7 @@ def test_validate_and_create_leaf_missing_source() -> None:
 
 def test_validate_and_create_leaf_empty_type() -> None:
     """_validate_and_create_leaf should return None for empty type string."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "", "source": "request_id"}
 
     leaf = validate_and_create_leaf(
@@ -698,7 +698,7 @@ def test_validate_and_create_leaf_empty_type() -> None:
 
 def test_validate_and_create_leaf_whitespace_type() -> None:
     """_validate_and_create_leaf should return None for whitespace-only type string."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "   ", "source": "request_id"}
 
     leaf = validate_and_create_leaf(
@@ -712,7 +712,7 @@ def test_validate_and_create_leaf_whitespace_type() -> None:
 
 def test_validate_and_create_leaf_empty_source() -> None:
     """_validate_and_create_leaf should return None for empty source string."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "str", "source": ""}
 
     leaf = validate_and_create_leaf(
@@ -726,7 +726,7 @@ def test_validate_and_create_leaf_empty_source() -> None:
 
 def test_validate_and_create_leaf_whitespace_source() -> None:
     """_validate_and_create_leaf should return None for whitespace source."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "str", "source": "\t\n"}
 
     leaf = validate_and_create_leaf(
@@ -740,7 +740,7 @@ def test_validate_and_create_leaf_whitespace_source() -> None:
 
 def test_validate_and_create_leaf_unknown_type() -> None:
     """_validate_and_create_leaf should return None for unknown type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "unknown_type", "source": "request_id"}
 
     leaf = validate_and_create_leaf(
@@ -755,7 +755,7 @@ def test_validate_and_create_leaf_unknown_type() -> None:
 
 def test_validate_and_create_leaf_list_missing_item_type() -> None:
     """_validate_and_create_leaf should return None for list type without item_type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags"}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
@@ -767,7 +767,7 @@ def test_validate_and_create_leaf_list_missing_item_type() -> None:
 
 def test_validate_and_create_leaf_list_empty_item_type() -> None:
     """_validate_and_create_leaf should return None for empty item_type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags", "item_type": ""}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
@@ -779,7 +779,7 @@ def test_validate_and_create_leaf_list_empty_item_type() -> None:
 
 def test_validate_and_create_leaf_list_invalid_item_type() -> None:
     """_validate_and_create_leaf should return None for invalid item_type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags", "item_type": "list"}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
@@ -792,7 +792,7 @@ def test_validate_and_create_leaf_list_invalid_item_type() -> None:
 
 def test_validate_and_create_leaf_list_unknown_item_type() -> None:
     """_validate_and_create_leaf should return None for unknown item_type."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags", "item_type": "unknown"}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
@@ -804,7 +804,7 @@ def test_validate_and_create_leaf_list_unknown_item_type() -> None:
 
 def test_validate_and_create_leaf_all_primitive_types() -> None:
     """_validate_and_create_leaf should work with all primitive types."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
 
     for type_name, expected_type in [
         ("str", str),
@@ -1166,8 +1166,8 @@ def test_get_current_working_directory_changes_with_cwd(
 def test_create_empty_compiled_schema_with_problems() -> None:
     """_create_empty_compiled_schema_with_problems creates empty schema with problems."""  # noqa: E501
     problems = [
-        SchemaProblem("Problem 1"),
-        SchemaProblem("Problem 2"),
+        _SchemaProblem("Problem 1"),
+        _SchemaProblem("Problem 2"),
     ]
 
     compiled, result_problems = create_empty_schema(problems)
@@ -1181,7 +1181,7 @@ def test_create_empty_compiled_schema_with_problems() -> None:
 
 def test_create_empty_compiled_schema_with_empty_problems() -> None:
     """_create_empty_compiled_schema_with_problems works with empty problems list."""  # noqa: E501
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
 
     compiled, result_problems = create_empty_schema(problems)
 
@@ -1262,7 +1262,7 @@ def test_load_raw_schema_raises_value_error_for_non_object(
 
 def test_compile_schema_tree_compiles_simple_tree() -> None:
     """_compile_schema_tree should compile a simple schema tree into leaves."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     node = {
         "ServicePayload": {
             "RequestID": {"type": "str", "source": "request_id"},
@@ -1281,7 +1281,7 @@ def test_compile_schema_tree_compiles_simple_tree() -> None:
 
 def test_compile_schema_tree_handles_nested_structure() -> None:
     """_compile_schema_tree should handle deeply nested structures."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     node = {
         "Level1": {
             "Level2": {
@@ -1302,7 +1302,7 @@ def test_compile_schema_tree_handles_nested_structure() -> None:
 
 def test_compile_schema_tree_reports_invalid_nodes() -> None:
     """_compile_schema_tree should report problems for invalid nodes."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     node = {
         "Valid": {
             "Leaf": {"type": "str", "source": "valid"},
@@ -1320,7 +1320,7 @@ def test_compile_schema_tree_reports_invalid_nodes() -> None:
 
 def test_compile_schema_tree_respects_max_depth() -> None:
     """_compile_schema_tree should stop processing when max depth is exceeded."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     # Create a path that exceeds MAX_SCHEMA_DEPTH
     node = {}
     current = node
@@ -1402,7 +1402,7 @@ def test_get_builtin_logrecord_attributes_is_cached() -> None:
 
 def test_check_root_conflicts_reports_conflicts() -> None:
     """_check_root_conflicts should report conflicts with reserved logging fields."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     schema_dict = {
         "name": {
             "Value": {"type": "str", "source": "value"},
@@ -1420,7 +1420,7 @@ def test_check_root_conflicts_reports_conflicts() -> None:
 
 def test_check_root_conflicts_no_conflicts() -> None:
     """_check_root_conflicts should not report problems when no conflicts exist."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     schema_dict = {
         "ServicePayload": {
             "RequestID": {"type": "str", "source": "request_id"},
@@ -1437,7 +1437,7 @@ def test_check_root_conflicts_no_conflicts() -> None:
 
 def test_check_root_conflicts_empty_schema() -> None:
     """_check_root_conflicts should handle empty schema."""
-    problems: list[SchemaProblem] = []
+    problems: list[_SchemaProblem] = []
     schema_dict: dict[str, Any] = {}
 
     check_root_conflicts(schema_dict, problems)

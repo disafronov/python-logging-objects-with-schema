@@ -17,7 +17,7 @@ import sys
 from collections.abc import Mapping
 from typing import Any
 
-from .errors import SchemaProblem
+from .errors import _SchemaProblem
 from .schema_applier import _apply_schema_internal
 from .schema_loader import _compile_schema_internal, _CompiledSchema
 
@@ -27,7 +27,7 @@ from .schema_loader import _compile_schema_internal, _CompiledSchema
 _USE_FINDCALLER = sys.version_info >= (3, 11)
 
 
-def _log_schema_problems_and_exit(problems: list[SchemaProblem]) -> None:
+def _log_schema_problems_and_exit(problems: list[_SchemaProblem]) -> None:
     """Log schema problems to stderr and terminate the application.
 
     Uses os._exit(1) instead of sys.exit(1) to ensure immediate termination
@@ -87,21 +87,21 @@ class SchemaLogger(logging.Logger):
         try:
             compiled, problems = _compile_schema_internal()
         except (OSError, ValueError, RuntimeError) as exc:
-            # Convert system-level exceptions to SchemaProblem so they can be
+            # Convert system-level exceptions to _SchemaProblem so they can be
             # handled the same way as schema validation problems.
             # - OSError: system-level file system issues (e.g., os.getcwd() failures
             #   when the current working directory is inaccessible or deleted).
             #   Note: OSError that occurs when reading the schema file (e.g., permission
-            #   denied, I/O errors) is converted to SchemaProblem in _load_raw_schema()
+            #   denied, I/O errors) is converted to _SchemaProblem in _load_raw_schema()
             #   and does not reach this exception handler.
             # - ValueError: path resolution issues (e.g., invalid path characters,
             #   malformed paths during schema file discovery)
             # - RuntimeError: threading issues (e.g., lock acquisition problems)
             # Note: JSON parsing and schema structure validation errors are
-            # converted to SchemaProblem instances and do not raise ValueError here.
+            # converted to _SchemaProblem instances and do not raise ValueError here.
             # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
             # caught, which is the correct behavior.
-            problems = [SchemaProblem(f"Schema compilation failed: {exc}")]
+            problems = [_SchemaProblem(f"Schema compilation failed: {exc}")]
             compiled = _CompiledSchema(leaves=[])
 
         if problems:
