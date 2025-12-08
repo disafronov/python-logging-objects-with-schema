@@ -27,8 +27,12 @@ MAX_SCHEMA_DEPTH = 100
 
 
 @dataclass
-class SchemaLeaf:
+class _SchemaLeaf:
     """Represents a single leaf in the schema tree.
+
+    This class is part of the internal implementation and is not considered
+    a public API. Its signature and behaviour may change between releases
+    without preserving backward compatibility.
 
     Attributes:
         path: Full path of keys from the schema root to this leaf.
@@ -48,7 +52,7 @@ class SchemaLeaf:
 class CompiledSchema:
     """Internal representation of a compiled schema."""
 
-    leaves: list[SchemaLeaf]
+    leaves: list[_SchemaLeaf]
 
     @property
     def is_empty(self) -> bool:
@@ -393,8 +397,8 @@ def _validate_and_create_leaf(
     path: tuple[str, ...],
     key: str,
     problems: list[SchemaProblem],
-) -> SchemaLeaf | None:
-    """Validate a leaf node and create SchemaLeaf if valid.
+) -> _SchemaLeaf | None:
+    """Validate a leaf node and create _SchemaLeaf if valid.
 
     Args:
         value_dict: Dictionary containing leaf node data.
@@ -403,7 +407,7 @@ def _validate_and_create_leaf(
         problems: List to collect validation problems.
 
     Returns:
-        SchemaLeaf if validation passes, None otherwise.
+        _SchemaLeaf if validation passes, None otherwise.
     """
     leaf_type = value_dict.get("type")
     leaf_source = value_dict.get("source")
@@ -471,11 +475,11 @@ def _validate_and_create_leaf(
             )
             return None
 
-    return SchemaLeaf(
+    return _SchemaLeaf(
         path=path + (key,),
         # Convert to string to ensure type consistency. Even though source should
         # be a string from JSON, this guards against unexpected types and ensures
-        # the SchemaLeaf always has a string source.
+        # the _SchemaLeaf always has a string source.
         source=str(leaf_source),
         expected_type=expected_type,
         item_expected_type=item_expected_type,
@@ -486,13 +490,13 @@ def _compile_schema_tree(
     node: MutableMapping[str, Any],
     path: tuple[str, ...],
     problems: list[SchemaProblem],
-) -> Iterable[SchemaLeaf]:
-    """Recursively compile a schema node into SchemaLeaf objects.
+) -> Iterable[_SchemaLeaf]:
+    """Recursively compile a schema node into _SchemaLeaf objects.
 
     This function recursively walks the schema tree structure, identifying leaf
     nodes (those with ``type`` and ``source`` fields) and inner nodes (those
     without these fields). Leaf nodes are validated and converted to
-    :class:`SchemaLeaf` objects, while inner nodes are recursively processed.
+    :class:`_SchemaLeaf` objects, while inner nodes are recursively processed.
 
     Performance considerations:
         Time complexity is O(n) where n is the total number of nodes in the
@@ -512,7 +516,7 @@ def _compile_schema_tree(
         problems: List to collect validation problems.
 
     Yields:
-        SchemaLeaf objects found in the tree.
+        _SchemaLeaf objects found in the tree.
     """
     # Check for excessive nesting depth (DoS protection: prevent deeply nested
     # schemas that could cause stack overflow or excessive memory usage).
@@ -708,7 +712,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
 
     # Compile the schema tree into leaves. Each root key becomes a separate
     # tree that we compile recursively. Problems are collected as we go.
-    leaves: list[SchemaLeaf] = []
+    leaves: list[_SchemaLeaf] = []
     for key, value in raw_schema.items():
         if not isinstance(value, Mapping):
             problems.append(

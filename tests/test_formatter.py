@@ -20,7 +20,7 @@ from logging_objects_with_schema.schema_applier import (
 from logging_objects_with_schema.schema_applier import (
     _validate_list_value as validate_list_value,
 )
-from logging_objects_with_schema.schema_loader import CompiledSchema, SchemaLeaf
+from logging_objects_with_schema.schema_loader import CompiledSchema, _SchemaLeaf
 
 
 def test_strip_empty_removes_empty_dicts() -> None:
@@ -92,17 +92,17 @@ def test_apply_schema_nested_structure() -> None:
     """apply_schema_internal should build nested structures correctly."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Metrics", "CPU"),
                 source="cpu_usage",
                 expected_type=float,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Metrics", "Memory"),
                 source="memory_usage",
                 expected_type=float,
@@ -131,12 +131,12 @@ def test_apply_schema_multiple_leaves_same_source_same_type() -> None:
     """Multiple leaves with same source and type should write to all locations."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Metadata", "ID"),
                 source="request_id",
                 expected_type=str,
@@ -160,10 +160,10 @@ def test_apply_schema_multiple_leaves_same_source_different_types() -> None:
     """Multiple leaves with same source but different types validate independently."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"), source="id", expected_type=str
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "IDNumber"), source="id", expected_type=int
             ),
         ],
@@ -184,7 +184,7 @@ def test_apply_schema_empty_list_valid() -> None:
     """Empty lists should be considered valid."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Tags"),
                 source="tags",
                 expected_type=list,
@@ -206,7 +206,7 @@ def test_apply_schema_list_with_primitives() -> None:
     """Lists with primitive values should be valid."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Tags"),
                 source="tags",
                 expected_type=list,
@@ -228,7 +228,7 @@ def test_apply_schema_list_with_mixed_primitives() -> None:
     """Lists with mixed primitive types should be invalid."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Values"),
                 source="values",
                 expected_type=list,
@@ -248,7 +248,7 @@ def test_apply_schema_list_with_non_primitives_invalid() -> None:
     """Lists with non-primitive elements should produce problems."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Items"),
                 source="items",
                 expected_type=list,
@@ -267,7 +267,7 @@ def test_apply_schema_list_with_nested_list_invalid() -> None:
     """Nested lists should produce problems."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Items"),
                 source="items",
                 expected_type=list,
@@ -286,7 +286,7 @@ def test_apply_schema_type_mismatch_produces_problem() -> None:
     """Type mismatches should produce problems."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "UserID"), source="user_id", expected_type=int
             ),
         ],
@@ -302,7 +302,7 @@ def test_apply_schema_none_value_produces_problem() -> None:
     """None values should produce problems."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "UserID"), source="user_id", expected_type=int
             ),
         ],
@@ -318,12 +318,12 @@ def test_apply_schema_none_value_with_multiple_leaves_produces_single_problem() 
     """None values with multiple leaves referencing same source produce one problem."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Metadata", "ID"),
                 source="request_id",
                 expected_type=str,
@@ -342,12 +342,12 @@ def test_apply_schema_partial_validation() -> None:
     """Some fields valid, others invalid should log valid ones and report problems."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "UserID"), source="user_id", expected_type=int
             ),
         ],
@@ -372,7 +372,7 @@ def test_apply_schema_redundant_fields_with_non_empty_schema() -> None:
     """Redundant fields should produce problems when schema is not empty."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
@@ -420,12 +420,12 @@ def test_apply_schema_strips_empty_dicts() -> None:
     """apply_schema_internal should strip empty dictionaries from result."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "Metadata", "ID"),
                 source="request_id",
                 expected_type=str,
@@ -447,7 +447,7 @@ def test_apply_schema_deeply_nested_structure() -> None:
     """apply_schema_internal should handle deeply nested structures."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("Level1", "Level2", "Level3", "Level4", "Value"),
                 source="value",
                 expected_type=str,
@@ -474,12 +474,12 @@ def test_apply_schema_missing_fields_no_problems() -> None:
     """Missing fields in extra should not produce problems, just be omitted."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "RequestID"),
                 source="request_id",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "UserID"), source="user_id", expected_type=int
             ),
         ],
@@ -494,8 +494,8 @@ def test_apply_schema_multiple_sources_different_branches() -> None:
     """Multiple sources in different branches should work independently."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(path=("Branch1", "Value"), source="value1", expected_type=str),
-            SchemaLeaf(path=("Branch2", "Value"), source="value2", expected_type=int),
+            _SchemaLeaf(path=("Branch1", "Value"), source="value1", expected_type=str),
+            _SchemaLeaf(path=("Branch2", "Value"), source="value2", expected_type=int),
         ],
     )
     extra = {
@@ -514,7 +514,7 @@ def test_apply_schema_bool_not_accepted_for_int() -> None:
     """Bool values should not pass validation for int types."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "UserID"), source="user_id", expected_type=int
             ),
         ],
@@ -540,7 +540,7 @@ def test_apply_schema_int_not_accepted_for_bool() -> None:
     """Int values should not pass validation for bool types."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "IsActive"),
                 source="is_active",
                 expected_type=bool,
@@ -568,22 +568,22 @@ def test_apply_schema_strict_type_checking_for_all_primitives() -> None:
     """Strict type checking should work for all primitive types."""
     schema = CompiledSchema(
         leaves=[
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "StringField"),
                 source="string_field",
                 expected_type=str,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "IntField"),
                 source="int_field",
                 expected_type=int,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "FloatField"),
                 source="float_field",
                 expected_type=float,
             ),
-            SchemaLeaf(
+            _SchemaLeaf(
                 path=("ServicePayload", "BoolField"),
                 source="bool_field",
                 expected_type=bool,
@@ -723,7 +723,7 @@ def test_set_nested_value_overwrites_existing_value() -> None:
 
 def test_validate_and_apply_leaf_valid_value() -> None:
     """validate_and_apply_leaf should apply valid value to target."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "RequestID"),
         source="request_id",
         expected_type=str,
@@ -739,7 +739,7 @@ def test_validate_and_apply_leaf_valid_value() -> None:
 
 def test_validate_and_apply_leaf_type_mismatch() -> None:
     """validate_and_apply_leaf should add problem for type mismatch."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "UserID"),
         source="user_id",
         expected_type=int,
@@ -756,7 +756,7 @@ def test_validate_and_apply_leaf_type_mismatch() -> None:
 
 def test_validate_and_apply_leaf_valid_list() -> None:
     """validate_and_apply_leaf should apply valid list value."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "Tags"),
         source="tags",
         expected_type=list,
@@ -773,7 +773,7 @@ def test_validate_and_apply_leaf_valid_list() -> None:
 
 def test_validate_and_apply_leaf_invalid_list() -> None:
     """validate_and_apply_leaf should add problem for invalid list."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "Values"),
         source="values",
         expected_type=list,
@@ -791,7 +791,7 @@ def test_validate_and_apply_leaf_invalid_list() -> None:
 
 def test_validate_and_apply_leaf_empty_list() -> None:
     """validate_and_apply_leaf should accept empty lists."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "Tags"),
         source="tags",
         expected_type=list,
@@ -808,7 +808,7 @@ def test_validate_and_apply_leaf_empty_list() -> None:
 
 def test_validate_and_apply_leaf_list_without_item_type() -> None:
     """validate_and_apply_leaf should add problem when item_expected_type is None."""
-    leaf = SchemaLeaf(
+    leaf = _SchemaLeaf(
         path=("ServicePayload", "Items"),
         source="items",
         expected_type=list,
