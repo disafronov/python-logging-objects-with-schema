@@ -1,6 +1,6 @@
 # Variables
 PYTEST_CMD = uv run python -m pytest -v
-COVERAGE_OPTS = --cov=. --cov-report=term-missing --cov-report=html
+COVERAGE_OPTS = --cov --cov-report=term-missing --cov-report=html
 
 # Phony targets
 .PHONY: all clean format help install lint test test-coverage
