@@ -1495,3 +1495,79 @@ def test_is_leaf_node_with_both_none() -> None:
     """_is_leaf_node should return False when both type and source are None."""
     value_dict = {"type": None, "source": None}
     assert is_leaf_node(value_dict) is False
+
+
+def test_compile_schema_internal_uses_cached_result_during_exception_handling(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_compile_schema_internal should use cached result during exception handling.
+
+    This test covers line 718: return cached result in exception handler when
+    another thread already compiled the schema while we were processing exception.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    # Clear cache first to ensure we don't hit the fast-path check
+    with schema_loader._cache_lock:
+        schema_loader._SCHEMA_CACHE.clear()
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = None
+        schema_loader._cached_cwd = None
+
+    # Create a pre-compiled result that simulates what another thread would cache
+    pre_cached_result = (
+        _CompiledSchema(leaves=[]),
+        [_SchemaProblem("Pre-cached error")],
+    )
+
+    # Patch _SCHEMA_CACHE.get to return None on first check (fast-path),
+    # but return cached result on second check (in exception handler)
+    original_cache = schema_loader._SCHEMA_CACHE
+    call_count = 0
+
+    def mock_cache_get(
+        key: Path,
+    ) -> tuple[_CompiledSchema, list[_SchemaProblem]] | None:
+        nonlocal call_count
+        call_count += 1
+        # First call is from fast-path check (line 694) - return None
+        # Second call is from exception handler (line 716) - return cached result
+        if call_count == 1:
+            return None
+        return pre_cached_result
+
+    # Create a mock cache that uses our custom get method
+    class MockCache(dict):
+        def get(self, key: Path) -> tuple[_CompiledSchema, list[_SchemaProblem]] | None:
+            return mock_cache_get(key)
+
+    mock_cache = MockCache()
+    monkeypatch.setattr(schema_loader, "_SCHEMA_CACHE", mock_cache)
+
+    # Now patch _load_raw_schema to raise exception, which will trigger
+    # exception handler that checks cache (line 718)
+    original_load = schema_loader._load_raw_schema
+
+    def mock_load_raises(
+        *args: object, **kwargs: object
+    ) -> tuple[dict[str, Any], Path]:
+        raise FileNotFoundError("Schema file not found")
+
+    monkeypatch.setattr(schema_loader, "_load_raw_schema", mock_load_raises)
+
+    try:
+        # This will trigger exception handling path
+        # Fast-path check will return None (call_count == 1)
+        # Exception handler will find pre_cached_result in cache
+        # (call_count == 2, line 718)
+        result, problems = compile_schema_internal()
+
+        # Should return the cached result, not create a new one
+        assert result is pre_cached_result[0]
+        assert problems is pre_cached_result[1]
+        assert call_count == 2  # Should have checked cache twice
+    finally:
+        # Restore original
+        monkeypatch.setattr(schema_loader, "_load_raw_schema", original_load)
+        monkeypatch.setattr(schema_loader, "_SCHEMA_CACHE", original_cache)
