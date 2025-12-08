@@ -19,7 +19,7 @@ from typing import Any
 
 from .errors import SchemaProblem
 from .schema_applier import _apply_schema_internal
-from .schema_loader import CompiledSchema, _compile_schema_internal
+from .schema_loader import _compile_schema_internal, _CompiledSchema
 
 # Python 3.11+ has improved findCaller() implementation with proper stacklevel support.
 # For Python < 3.11, we use inspect.stack() as a fallback due to known issues with
@@ -102,7 +102,7 @@ class SchemaLogger(logging.Logger):
             # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
             # caught, which is the correct behavior.
             problems = [SchemaProblem(f"Schema compilation failed: {exc}")]
-            compiled = CompiledSchema(leaves=[])
+            compiled = _CompiledSchema(leaves=[])
 
         if problems:
             # Schema is invalid; log problems and terminate without creating
@@ -111,7 +111,7 @@ class SchemaLogger(logging.Logger):
 
         # Schema is valid; create the logger instance.
         super().__init__(name, level)
-        self._schema: CompiledSchema = compiled
+        self._schema: _CompiledSchema = compiled
 
     def _log(
         self,

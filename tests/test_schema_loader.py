@@ -17,7 +17,6 @@ from logging_objects_with_schema.errors import SchemaProblem
 from logging_objects_with_schema.schema_loader import (
     MAX_SCHEMA_DEPTH,
     SCHEMA_FILE_NAME,
-    CompiledSchema,
 )
 from logging_objects_with_schema.schema_loader import (
     _cache_and_return_found_path as cache_and_return_found_path,
@@ -39,6 +38,9 @@ from logging_objects_with_schema.schema_loader import (
 )
 from logging_objects_with_schema.schema_loader import (
     _compile_schema_tree as compile_schema_tree,
+)
+from logging_objects_with_schema.schema_loader import (
+    _CompiledSchema,
 )
 from logging_objects_with_schema.schema_loader import (
     _create_empty_compiled_schema_with_problems as create_empty_schema,
@@ -78,7 +80,7 @@ def test_missing_schema_file_produces_empty_schema_and_problem(
 
     compiled, problems = compile_schema_internal()
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert problems
 
@@ -94,7 +96,7 @@ def test_completely_invalid_schema_is_empty_and_reports_problems(
 
     compiled, problems = compile_schema_internal()
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert problems
 
@@ -117,7 +119,7 @@ def test_partially_valid_schema_preserves_valid_leaves(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     assert any(leaf.source == "request_id" for leaf in compiled.leaves)
     assert problems
@@ -141,7 +143,7 @@ def test_root_key_conflicting_with_logging_field_produces_problem(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert any(
         "conflicts with reserved logging fields" in problem.message
         for problem in problems
@@ -165,7 +167,7 @@ def test_root_key_not_conflicting_passes_validation(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     # Should not have problems related to root key conflicts
     root_conflict_problems = [
@@ -184,7 +186,7 @@ def test_empty_schema_produces_empty_compiled_schema(
     _write_schema(tmp_path, {})
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert problems == []
 
@@ -208,7 +210,7 @@ def test_schema_with_only_inner_nodes_produces_empty_compiled_schema(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Schema with only inner nodes is valid, just empty (no problems)
     assert problems == []
@@ -239,7 +241,7 @@ def test_deeply_nested_schema_compiles_correctly(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     assert len(compiled.leaves) == 1
     assert compiled.leaves[0].source == "value"
@@ -276,7 +278,7 @@ def test_duplicate_source_in_different_branches(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     # Should have two leaves with same source but different paths
     leaves_with_source = [
@@ -305,7 +307,7 @@ def test_incomplete_leaf_missing_type(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert any("type cannot be None or empty" in p.message for p in problems)
 
@@ -327,7 +329,7 @@ def test_incomplete_leaf_missing_source(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert any("source cannot be None or empty" in p.message for p in problems)
 
@@ -349,7 +351,7 @@ def test_incomplete_leaf_empty_source(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert any("source cannot be None or empty" in p.message for p in problems)
 
@@ -371,7 +373,7 @@ def test_incomplete_leaf_empty_type(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert any("type cannot be None or empty" in p.message for p in problems)
 
@@ -399,7 +401,7 @@ def test_multiple_root_keys_with_valid_leaves(
     )
 
     compiled, problems = compile_schema_internal()
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     assert len(compiled.leaves) == 3
     sources = {leaf.source for leaf in compiled.leaves}
@@ -489,7 +491,7 @@ def test_schema_file_os_error_produces_problem_and_empty_schema(
 
     compiled, problems = compile_schema_internal()
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert problems
     assert any("Failed to read schema file" in p.message for p in problems)
@@ -512,7 +514,7 @@ def test_schema_changes_on_disk_are_not_reloaded_in_same_process(
     )
 
     compiled1, problems1 = compile_schema_internal()
-    assert isinstance(compiled1, CompiledSchema)
+    assert isinstance(compiled1, _CompiledSchema)
     assert not compiled1.is_empty
     assert any(leaf.source == "v1" for leaf in compiled1.leaves)
     assert problems1 == []
@@ -530,7 +532,7 @@ def test_schema_changes_on_disk_are_not_reloaded_in_same_process(
     compiled2, problems2 = compile_schema_internal()
     # Compiled schema and problems should be served from cache, ignoring
     # on-disk changes.
-    assert isinstance(compiled2, CompiledSchema)
+    assert isinstance(compiled2, _CompiledSchema)
     assert not compiled2.is_empty
     assert any(leaf.source == "v1" for leaf in compiled2.leaves)
     assert not any(leaf.source == "v2" for leaf in compiled2.leaves)
@@ -549,7 +551,7 @@ def test_invalid_schema_result_is_cached_within_same_process(
     _write_schema(tmp_path, {"foo": "not-an-object"})
 
     compiled1, problems1 = compile_schema_internal()
-    assert isinstance(compiled1, CompiledSchema)
+    assert isinstance(compiled1, _CompiledSchema)
     assert compiled1.is_empty
     assert problems1
 
@@ -566,7 +568,7 @@ def test_invalid_schema_result_is_cached_within_same_process(
     compiled2, problems2 = compile_schema_internal()
 
     # Still see the cached "invalid" result: no leaves and the original problems.
-    assert isinstance(compiled2, CompiledSchema)
+    assert isinstance(compiled2, _CompiledSchema)
     assert compiled2.is_empty
     assert problems2
 
@@ -842,7 +844,7 @@ def test_schema_exceeds_max_depth_produces_problem(
 
     compiled, problems = compile_schema_internal()
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert any(
         "exceeds maximum allowed depth" in p.message
@@ -873,7 +875,7 @@ def test_schema_at_max_depth_compiles_correctly(
 
     compiled, problems = compile_schema_internal()
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert not compiled.is_empty
     assert len(compiled.leaves) == 1
     assert compiled.leaves[0].source == "value"
@@ -1170,7 +1172,7 @@ def test_create_empty_compiled_schema_with_problems() -> None:
 
     compiled, result_problems = create_empty_schema(problems)
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert compiled.leaves == []
     assert result_problems == problems
@@ -1183,7 +1185,7 @@ def test_create_empty_compiled_schema_with_empty_problems() -> None:
 
     compiled, result_problems = create_empty_schema(problems)
 
-    assert isinstance(compiled, CompiledSchema)
+    assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     assert result_problems == []
 
