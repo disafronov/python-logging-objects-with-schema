@@ -12,7 +12,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 from .errors import DataProblem
-from .schema_loader import CompiledSchema, SchemaLeaf
+from .schema_loader import CompiledSchema, _SchemaLeaf
 
 
 def _create_validation_error_json(field: str, error: str, value: Any) -> str:
@@ -124,7 +124,7 @@ def _set_nested_value(
 
 
 def _validate_and_apply_leaf(
-    leaf: SchemaLeaf,
+    leaf: _SchemaLeaf,
     value: Any,
     source: str,
     extra: MutableMapping[str, Any],
@@ -280,7 +280,7 @@ def _apply_schema_internal(
     # all leaves for a given source together, which is more efficient and allows
     # us to validate the value once per source (e.g., checking for None) rather
     # than once per leaf.
-    source_to_leaves: dict[str, list[SchemaLeaf]] = defaultdict(list)
+    source_to_leaves: dict[str, list[_SchemaLeaf]] = defaultdict(list)
     for leaf in compiled.leaves:
         source_to_leaves[leaf.source].append(leaf)
 

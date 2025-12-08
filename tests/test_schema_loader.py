@@ -18,7 +18,6 @@ from logging_objects_with_schema.schema_loader import (
     MAX_SCHEMA_DEPTH,
     SCHEMA_FILE_NAME,
     CompiledSchema,
-    SchemaLeaf,
 )
 from logging_objects_with_schema.schema_loader import (
     _cache_and_return_found_path as cache_and_return_found_path,
@@ -57,6 +56,9 @@ from logging_objects_with_schema.schema_loader import (
 from logging_objects_with_schema.schema_loader import _is_leaf_node as is_leaf_node
 from logging_objects_with_schema.schema_loader import (
     _load_raw_schema as load_raw_schema,
+)
+from logging_objects_with_schema.schema_loader import (
+    _SchemaLeaf,
 )
 from logging_objects_with_schema.schema_loader import (
     _validate_and_create_leaf as validate_and_create_leaf,
@@ -617,7 +619,7 @@ def test_is_empty_or_none_with_non_string_types() -> None:
 
 
 def test_validate_and_create_leaf_valid_primitive() -> None:
-    """_validate_and_create_leaf should create SchemaLeaf for valid primitive type."""
+    """_validate_and_create_leaf should create _SchemaLeaf for valid primitive type."""
     problems: list[SchemaProblem] = []
     value_dict = {"type": "str", "source": "request_id"}
 
@@ -626,7 +628,7 @@ def test_validate_and_create_leaf_valid_primitive() -> None:
     )
 
     assert leaf is not None
-    assert isinstance(leaf, SchemaLeaf)
+    assert isinstance(leaf, _SchemaLeaf)
     assert leaf.path == ("ServicePayload", "RequestID")
     assert leaf.source == "request_id"
     assert leaf.expected_type is str
@@ -635,14 +637,14 @@ def test_validate_and_create_leaf_valid_primitive() -> None:
 
 
 def test_validate_and_create_leaf_valid_list_type() -> None:
-    """_validate_and_create_leaf should create SchemaLeaf for valid list type."""
+    """_validate_and_create_leaf should create _SchemaLeaf for valid list type."""
     problems: list[SchemaProblem] = []
     value_dict = {"type": "list", "source": "tags", "item_type": "str"}
 
     leaf = validate_and_create_leaf(value_dict, ("ServicePayload",), "Tags", problems)
 
     assert leaf is not None
-    assert isinstance(leaf, SchemaLeaf)
+    assert isinstance(leaf, _SchemaLeaf)
     assert leaf.path == ("ServicePayload", "Tags")
     assert leaf.source == "tags"
     assert leaf.expected_type is list
@@ -1269,7 +1271,7 @@ def test_compile_schema_tree_compiles_simple_tree() -> None:
     leaves = list(compile_schema_tree(node, (), problems))
 
     assert len(leaves) == 2
-    assert all(isinstance(leaf, SchemaLeaf) for leaf in leaves)
+    assert all(isinstance(leaf, _SchemaLeaf) for leaf in leaves)
     sources = {leaf.source for leaf in leaves}
     assert sources == {"request_id", "user_id"}
     assert problems == []
