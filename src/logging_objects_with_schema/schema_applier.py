@@ -12,7 +12,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 from .errors import DataProblem
-from .schema_loader import CompiledSchema, _SchemaLeaf
+from .schema_loader import _CompiledSchema, _SchemaLeaf
 
 
 def _create_validation_error_json(field: str, error: str, value: Any) -> str:
@@ -203,12 +203,12 @@ def _strip_empty(node: Any) -> Any:
 
 
 def _apply_schema_internal(
-    compiled: CompiledSchema,
+    compiled: _CompiledSchema,
     extra_values: Mapping[str, Any],
 ) -> tuple[dict[str, Any], list[DataProblem]]:
     """Internal function to build structured ``extra`` from compiled schema.
 
-    The function applies a :class:`CompiledSchema` to user-provided ``extra``
+    The function applies a :class:`_CompiledSchema` to user-provided ``extra``
     values and returns a tuple ``(structured_extra, problems)`` where:
 
     - ``structured_extra`` is a nested dictionary that follows the schema
