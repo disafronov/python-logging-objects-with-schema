@@ -274,13 +274,17 @@ def _get_schema_path() -> Path:
         Absolute path where the schema file is located or expected to be.
     """
     with _path_cache_lock:
+        # Check cached path for missing file first (CWD-dependent)
+        # This must be checked before found file cache, because
+        # _check_cached_found_file_path would invalidate the cache if file
+        # doesn't exist, even for missing file cache.
+        if _cached_cwd is not None:
+            cached_path = _check_cached_missing_file_path()
+            if cached_path is not None:
+                return cached_path
+
         # Check cached path for found file (CWD-independent)
         cached_path = _check_cached_found_file_path()
-        if cached_path is not None:
-            return cached_path
-
-        # Check cached path for missing file (CWD-dependent)
-        cached_path = _check_cached_missing_file_path()
         if cached_path is not None:
             return cached_path
 
