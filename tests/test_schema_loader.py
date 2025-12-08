@@ -47,6 +47,9 @@ from logging_objects_with_schema.schema_loader import (
 )
 from logging_objects_with_schema.schema_loader import _format_path as format_path
 from logging_objects_with_schema.schema_loader import (
+    _get_builtin_logrecord_attributes,
+)
+from logging_objects_with_schema.schema_loader import (
     _get_current_working_directory as get_current_working_directory,
 )
 from logging_objects_with_schema.schema_loader import (
@@ -64,9 +67,6 @@ from logging_objects_with_schema.schema_loader import (
 )
 from logging_objects_with_schema.schema_loader import (
     _validate_and_create_leaf as validate_and_create_leaf,
-)
-from logging_objects_with_schema.schema_loader import (
-    get_builtin_logrecord_attributes,
 )
 
 
@@ -1338,18 +1338,18 @@ def test_compile_schema_tree_respects_max_depth() -> None:
     assert any("exceeds maximum allowed depth" in p.message for p in problems)
 
 
-def test_get_builtin_logrecord_attributes_returns_set() -> None:
-    """get_builtin_logrecord_attributes should return a set of attribute names."""
-    attributes = get_builtin_logrecord_attributes()
+def test__get_builtin_logrecord_attributes_returns_set() -> None:
+    """_get_builtin_logrecord_attributes should return a set of attribute names."""
+    attributes = _get_builtin_logrecord_attributes()
 
     assert isinstance(attributes, set)
     assert len(attributes) > 0
     assert all(isinstance(attr, str) for attr in attributes)
 
 
-def test_get_builtin_logrecord_attributes_includes_common_fields() -> None:
-    """get_builtin_logrecord_attributes should include common LogRecord fields."""
-    attributes = get_builtin_logrecord_attributes()
+def test__get_builtin_logrecord_attributes_includes_common_fields() -> None:
+    """_get_builtin_logrecord_attributes should include common LogRecord fields."""
+    attributes = _get_builtin_logrecord_attributes()
 
     # These are standard LogRecord attributes
     assert "name" in attributes
@@ -1359,18 +1359,18 @@ def test_get_builtin_logrecord_attributes_includes_common_fields() -> None:
     assert "msg" in attributes
 
 
-def test_get_builtin_logrecord_attributes_excludes_private_attributes() -> None:
-    """get_builtin_logrecord_attributes should not include private attributes."""
-    attributes = get_builtin_logrecord_attributes()
+def test__get_builtin_logrecord_attributes_excludes_private_attributes() -> None:
+    """_get_builtin_logrecord_attributes should not include private attributes."""
+    attributes = _get_builtin_logrecord_attributes()
 
     # Should not include private attributes (starting with _)
     private_attrs = {attr for attr in attributes if attr.startswith("_")}
     assert not private_attrs
 
 
-def test_get_builtin_logrecord_attributes_excludes_methods() -> None:
-    """get_builtin_logrecord_attributes should not include callable methods."""
-    attributes = get_builtin_logrecord_attributes()
+def test__get_builtin_logrecord_attributes_excludes_methods() -> None:
+    """_get_builtin_logrecord_attributes should not include callable methods."""
+    attributes = _get_builtin_logrecord_attributes()
 
     # Should not include methods (callable attributes)
     import logging
@@ -1391,10 +1391,10 @@ def test_get_builtin_logrecord_attributes_excludes_methods() -> None:
         assert not callable(value), f"Attribute {attr} should not be callable"
 
 
-def test_get_builtin_logrecord_attributes_is_cached() -> None:
-    """get_builtin_logrecord_attributes is cached (same result on multiple calls)."""  # noqa: E501
-    attrs1 = get_builtin_logrecord_attributes()
-    attrs2 = get_builtin_logrecord_attributes()
+def test__get_builtin_logrecord_attributes_is_cached() -> None:
+    """_get_builtin_logrecord_attributes is cached (same result on multiple calls)."""  # noqa: E501
+    attrs1 = _get_builtin_logrecord_attributes()
+    attrs2 = _get_builtin_logrecord_attributes()
 
     # Should return the same set (cached)
     assert attrs1 is attrs2
