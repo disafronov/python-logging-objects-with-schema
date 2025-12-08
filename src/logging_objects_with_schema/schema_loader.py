@@ -561,8 +561,12 @@ def _compile_schema_tree(
 
 
 @functools.lru_cache(maxsize=1)
-def get_builtin_logrecord_attributes() -> set[str]:
+def _get_builtin_logrecord_attributes() -> set[str]:
     """Get set of standard LogRecord attribute names.
+
+    This function is part of the internal implementation and is not considered
+    a public API. Its signature and behaviour may change between releases
+    without preserving backward compatibility.
 
     This function extracts attribute names from LogRecord that represent
     system fields and should not be used as root keys in the schema or
@@ -582,7 +586,7 @@ def get_builtin_logrecord_attributes() -> set[str]:
         Examples include: 'name', 'levelno', 'pathname', 'lineno', 'msg', etc.
 
     Example:
-        >>> forbidden = get_builtin_logrecord_attributes()
+        >>> forbidden = _get_builtin_logrecord_attributes()
         >>> "name" in forbidden
         True
         >>> "ServicePayload" in forbidden
@@ -621,7 +625,7 @@ def _check_root_conflicts(
 ) -> None:
     """Check schema root keys for conflicts with reserved logging fields."""
 
-    forbidden_root_keys = get_builtin_logrecord_attributes()
+    forbidden_root_keys = _get_builtin_logrecord_attributes()
 
     for key in schema_dict.keys():
         if key in forbidden_root_keys:
