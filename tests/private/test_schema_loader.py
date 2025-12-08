@@ -1497,6 +1497,31 @@ def test_is_leaf_node_with_both_none() -> None:
     assert is_leaf_node(value_dict) is False
 
 
+def test_get_schema_path_uses_cached_missing_file_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_get_schema_path should use cached missing file path on second call.
+
+    This test covers line 285: return cached_path when missing file is cached.
+    After fixing _check_cached_found_file_path to not invalidate cache for
+    missing files, this path is now reachable.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    # First call - file not found, should cache the missing path
+    path1 = get_schema_path()
+    assert path1 == (tmp_path / _SCHEMA_FILE_NAME).resolve()
+    assert not path1.exists()
+
+    # Second call - should return cached path (line 285)
+    # _check_cached_found_file_path() will return None (because _cached_cwd is not None)
+    # _check_cached_missing_file_path() should return the cached path
+    path2 = get_schema_path()
+    assert path2 == path1
+    assert path2 == (tmp_path / _SCHEMA_FILE_NAME).resolve()
+
+
 def test_compile_schema_internal_uses_cached_result_during_exception_handling(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
