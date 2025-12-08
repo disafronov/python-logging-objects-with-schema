@@ -49,8 +49,13 @@ class _SchemaLeaf:
 
 
 @dataclass
-class CompiledSchema:
-    """Internal representation of a compiled schema."""
+class _CompiledSchema:
+    """Internal representation of a compiled schema.
+
+    This class is part of the internal implementation and is not considered
+    a public API. Its signature and behaviour may change between releases
+    without preserving backward compatibility.
+    """
 
     leaves: list[_SchemaLeaf]
 
@@ -63,16 +68,16 @@ class CompiledSchema:
 
 def _create_empty_compiled_schema_with_problems(
     problems: list[SchemaProblem],
-) -> tuple[CompiledSchema, list[SchemaProblem]]:
-    """Create an empty CompiledSchema with problems.
+) -> tuple[_CompiledSchema, list[SchemaProblem]]:
+    """Create an empty _CompiledSchema with problems.
 
     Args:
         problems: List of schema problems.
 
     Returns:
-        Tuple of (empty CompiledSchema, problems list).
+        Tuple of (empty _CompiledSchema, problems list).
     """
-    return (CompiledSchema(leaves=[]), problems)
+    return (_CompiledSchema(leaves=[]), problems)
 
 
 _TYPE_MAP: Mapping[str, type] = {
@@ -105,9 +110,9 @@ _TYPE_MAP: Mapping[str, type] = {
 # use double-checked locking to avoid race conditions.
 
 # Compiled schema cache: Key is absolute schema_path, Value is tuple of
-# (CompiledSchema, list[SchemaProblem]). This cache stores both successful
+# (_CompiledSchema, list[SchemaProblem]). This cache stores both successful
 # compilations and failures (with problems list).
-_SCHEMA_CACHE: dict[Path, tuple[CompiledSchema, list[SchemaProblem]]] = {}
+_SCHEMA_CACHE: dict[Path, tuple[_CompiledSchema, list[SchemaProblem]]] = {}
 
 _cache_lock = threading.RLock()
 
@@ -627,17 +632,17 @@ def _check_root_conflicts(
             )
 
 
-def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
-    """Compile JSON schema into ``CompiledSchema`` and collect all problems.
+def _compile_schema_internal() -> tuple[_CompiledSchema, list[SchemaProblem]]:
+    """Compile JSON schema into ``_CompiledSchema`` and collect all problems.
 
     The function loads the raw JSON schema, validates its structure, checks
     root keys for conflicts with reserved ``logging.LogRecord`` attributes
-    and compiles all valid leaves into a :class:`CompiledSchema`. All issues
+    and compiles all valid leaves into a :class:`_CompiledSchema`. All issues
     discovered during this process are reported as :class:`SchemaProblem`
     instances.
 
     Results are cached process-wide: the cache key is the absolute schema
-    file path and the value is a tuple ``(CompiledSchema, list[SchemaProblem])``.
+    file path and the value is a tuple ``(_CompiledSchema, list[SchemaProblem])``.
     Once a schema for a given path has been observed (including the cases when
     it is missing or invalid), subsequent calls always return the cached result
     without re-reading or re-compiling the schema. To pick up on-disk changes
@@ -646,7 +651,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
 
     This function never raises exceptions. It always returns the best-effort
     compiled schema together with a list of problems detected during processing
-    (an empty ``CompiledSchema`` when the schema is missing or invalid).
+    (an empty ``_CompiledSchema`` when the schema is missing or invalid).
 
     Performance considerations:
         First compilation of a schema involves file I/O, JSON parsing, and tree
@@ -669,7 +674,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
         between releases without preserving backward compatibility.
 
     Returns:
-        Tuple of (CompiledSchema, list[SchemaProblem]).
+        Tuple of (_CompiledSchema, list[SchemaProblem]).
     """
     schema_path = _get_schema_path()
 
@@ -726,7 +731,7 @@ def _compile_schema_internal() -> tuple[CompiledSchema, list[SchemaProblem]]:
         for leaf in _compile_schema_tree(dict(value), (key,), problems):
             leaves.append(leaf)
 
-    compiled = CompiledSchema(leaves=leaves)
+    compiled = _CompiledSchema(leaves=leaves)
     result = (compiled, problems)
 
     # Double-checked locking: Check cache again while holding lock. Another thread
