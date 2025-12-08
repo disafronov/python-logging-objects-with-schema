@@ -10,17 +10,17 @@ module.exports = {
         ["@semantic-release/commit-analyzer", {
             "preset": "conventionalcommits",
             "releaseRules": [
-            { "type": "feat", "release": "minor" },
-            { "type": "fix", "release": "patch" },
-            { "type": "perf", "release": "patch" },
-            { "type": "revert", "release": "patch" },
-            { "type": "refactor", "release": "patch" },
-            { "type": "docs", "release": false },
-            { "type": "style", "release": false },
-            { "type": "test", "release": false },
-            { "type": "build", "release": false },
-            { "type": "ci", "release": false },
-            { "type": "chore", "release": false }
+                { "type": "feat", "release": "minor" },
+                { "type": "fix", "release": "patch" },
+                { "type": "perf", "release": "patch" },
+                { "type": "revert", "release": "patch" },
+                { "type": "refactor", "release": "patch" },
+                { "type": "docs", "release": false },
+                { "type": "style", "release": false },
+                { "type": "test", "release": false },
+                { "type": "build", "release": false },
+                { "type": "ci", "release": false },
+                { "type": "chore", "release": false }
             ]
         }],
         ["@semantic-release/release-notes-generator", { "preset": "conventionalcommits" }],
@@ -31,10 +31,10 @@ module.exports = {
         ["@semantic-release/git", {
             "assets": ["CHANGELOG.md", "pyproject.toml", "uv.lock"],
             "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}\n\nSigned-off-by: " +
-            (process.env.GIT_AUTHOR_NAME || process.env.GIT_COMMITTER_NAME || "Release Bot") +
-            " <" +
-            (process.env.GIT_AUTHOR_EMAIL || process.env.GIT_COMMITTER_EMAIL || "noreply@github.com") +
-            ">"
+                (process.env.GIT_AUTHOR_NAME || process.env.GIT_COMMITTER_NAME || "Release Bot") +
+                " <" +
+                (process.env.GIT_AUTHOR_EMAIL || process.env.GIT_COMMITTER_EMAIL || "noreply@github.com") +
+                ">"
         }],
         ["@semantic-release/github", {}]
     ]
