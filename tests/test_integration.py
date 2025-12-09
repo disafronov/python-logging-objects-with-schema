@@ -547,3 +547,181 @@ def test_schema_logger_handles_valueerror_and_terminates(
     finally:
         monkeypatch.setattr(schema_loader, "_get_schema_path", original_get_schema_path)
         logging.setLoggerClass(logging.Logger)
+
+
+def test_schema_logger_with_forbidden_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SchemaLogger should accept forbidden_keys parameter and use it for validation."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": "str", "source": "request_id"},
+            },
+            "CustomForbidden": {
+                "Value": {"type": "str", "source": "value"},
+            },
+        },
+    )
+
+    # Without forbidden_keys, CustomForbidden should be valid
+    logger1 = SchemaLogger("logger1")
+    assert isinstance(logger1, SchemaLogger)
+
+    # With forbidden_keys, CustomForbidden should cause schema validation to fail
+    import sys
+    from io import StringIO
+
+    stderr_output = StringIO()
+    original_stderr = sys.stderr
+    sys.stderr = stderr_output
+
+    exit_called = False
+    exit_code = None
+
+    def mock_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+
+    monkeypatch.setattr("os._exit", mock_exit)
+
+    try:
+        SchemaLogger("logger2", forbidden_keys={"CustomForbidden"})
+    except SystemExit:
+        pass
+    finally:
+        sys.stderr = original_stderr
+
+    assert exit_called
+    assert exit_code == 1
+    assert "CustomForbidden" in stderr_output.getvalue()
+    assert "conflicts with reserved logging fields" in stderr_output.getvalue()
+
+
+def test_schema_logger_inheritance_with_forbidden_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Subclass of SchemaLogger can pass forbidden_keys to parent."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": "str", "source": "request_id"},
+            },
+            "ChildForbidden": {
+                "Value": {"type": "str", "source": "value"},
+            },
+        },
+    )
+
+    class ChildLogger(SchemaLogger):
+        def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+            # Child can pass its own forbidden keys to parent
+            super().__init__(name, level, forbidden_keys={"ChildForbidden"})
+
+    # Creating child logger should fail because ChildForbidden conflicts
+    import sys
+    from io import StringIO
+
+    stderr_output = StringIO()
+    original_stderr = sys.stderr
+    sys.stderr = stderr_output
+
+    exit_called = False
+    exit_code = None
+
+    def mock_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+
+    monkeypatch.setattr("os._exit", mock_exit)
+
+    try:
+        ChildLogger("child_logger")
+    except SystemExit:
+        pass
+    finally:
+        sys.stderr = original_stderr
+
+    assert exit_called
+    assert exit_code == 1
+    assert "ChildForbidden" in stderr_output.getvalue()
+
+
+def test_schema_logger_inheritance_merges_forbidden_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Subclass can merge forbidden_keys from its own subclass and pass to parent."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": "str", "source": "request_id"},
+            },
+            "ParentForbidden": {
+                "Value": {"type": "str", "source": "value"},
+            },
+            "ChildForbidden": {
+                "Value": {"type": "str", "source": "value2"},
+            },
+        },
+    )
+
+    class ParentLogger(SchemaLogger):
+        def __init__(
+            self,
+            name: str,
+            level: int = logging.NOTSET,
+            forbidden_keys: set[str] | None = None,
+        ) -> None:
+            # Parent merges its own keys with keys from child
+            parent_keys = {"ParentForbidden"}
+            if forbidden_keys:
+                parent_keys = parent_keys | forbidden_keys
+            super().__init__(name, level, forbidden_keys=parent_keys)
+
+    class ChildLogger(ParentLogger):
+        def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+            # Child passes its keys to parent, which merges them
+            super().__init__(name, level, forbidden_keys={"ChildForbidden"})
+
+    # Creating child logger should fail because both ParentForbidden and
+    # ChildForbidden conflict
+    import sys
+    from io import StringIO
+
+    stderr_output = StringIO()
+    original_stderr = sys.stderr
+    sys.stderr = stderr_output
+
+    exit_called = False
+    exit_code = None
+
+    def mock_exit(code: int) -> None:
+        nonlocal exit_called, exit_code
+        exit_called = True
+        exit_code = code
+
+    monkeypatch.setattr("os._exit", mock_exit)
+
+    try:
+        ChildLogger("child_logger")
+    except SystemExit:
+        pass
+    finally:
+        sys.stderr = original_stderr
+
+    assert exit_called
+    assert exit_code == 1
+    output = stderr_output.getvalue()
+    assert "ParentForbidden" in output
+    assert "ChildForbidden" in output

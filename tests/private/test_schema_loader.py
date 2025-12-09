@@ -1412,7 +1412,7 @@ def test_check_root_conflicts_reports_conflicts() -> None:
         },
     }
 
-    check_root_conflicts(schema_dict, problems)
+    check_root_conflicts(schema_dict, problems, forbidden_keys=None)
 
     assert len(problems) == 2
     assert all("conflicts with reserved logging fields" in p.message for p in problems)
@@ -1430,7 +1430,7 @@ def test_check_root_conflicts_no_conflicts() -> None:
         },
     }
 
-    check_root_conflicts(schema_dict, problems)
+    check_root_conflicts(schema_dict, problems, forbidden_keys=None)
 
     assert problems == []
 
@@ -1440,7 +1440,7 @@ def test_check_root_conflicts_empty_schema() -> None:
     problems: list[_SchemaProblem] = []
     schema_dict: dict[str, Any] = {}
 
-    check_root_conflicts(schema_dict, problems)
+    check_root_conflicts(schema_dict, problems, forbidden_keys=None)
 
     assert problems == []
 
@@ -1596,3 +1596,108 @@ def test_compile_schema_internal_uses_cached_result_during_exception_handling(
         # Restore original
         monkeypatch.setattr(schema_loader, "_load_raw_schema", original_load)
         monkeypatch.setattr(schema_loader, "_SCHEMA_CACHE", original_cache)
+
+
+def test_check_root_conflicts_with_additional_forbidden_keys() -> None:
+    """_check_root_conflicts should merge additional forbidden keys with builtin.
+
+    Additional forbidden keys are merged with builtin LogRecord attributes.
+    """
+    problems: list[_SchemaProblem] = []
+    schema_dict = {
+        "custom_forbidden": {
+            "Value": {"type": "str", "source": "value"},
+        },
+        "ServicePayload": {
+            "RequestID": {"type": "str", "source": "request_id"},
+        },
+    }
+
+    # Without additional keys, custom_forbidden should pass
+    check_root_conflicts(schema_dict, problems, forbidden_keys=None)
+    assert len(problems) == 0
+
+    # With additional keys, custom_forbidden should be reported
+    problems.clear()
+    check_root_conflicts(schema_dict, problems, forbidden_keys={"custom_forbidden"})
+    assert len(problems) == 1
+    assert "custom_forbidden" in problems[0].message
+    assert "conflicts with reserved logging fields" in problems[0].message
+
+
+def test_check_root_conflicts_merges_builtin_and_additional_keys() -> None:
+    """_check_root_conflicts should merge builtin and additional forbidden keys."""
+    problems: list[_SchemaProblem] = []
+    schema_dict = {
+        "name": {  # Builtin key
+            "Value": {"type": "str", "source": "value"},
+        },
+        "custom_key": {  # Additional key
+            "Value": {"type": "str", "source": "value2"},
+        },
+        "ServicePayload": {  # Valid key
+            "RequestID": {"type": "str", "source": "request_id"},
+        },
+    }
+
+    check_root_conflicts(schema_dict, problems, forbidden_keys={"custom_key"})
+
+    # Both builtin and additional keys should be reported
+    assert len(problems) == 2
+    problem_messages = [p.message for p in problems]
+    assert any("name" in msg and "conflicts" in msg for msg in problem_messages)
+    assert any("custom_key" in msg and "conflicts" in msg for msg in problem_messages)
+
+
+def test_compile_schema_internal_with_forbidden_keys(tmp_path: Path) -> None:
+    """_compile_schema_internal should accept and use forbidden_keys parameter."""
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
+    schema_file.write_text(
+        '{"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}}',
+        encoding="utf-8",
+    )
+
+    # Clear cache
+    with schema_loader._cache_lock:
+        schema_loader._SCHEMA_CACHE.clear()
+
+    # Compile without forbidden keys
+    compiled1, problems1 = compile_schema_internal(forbidden_keys=None)
+    assert not problems1
+
+    # Compile with forbidden keys that don't conflict
+    compiled2, problems2 = compile_schema_internal(forbidden_keys={"some_key"})
+    assert not problems2
+
+    # Compile with forbidden keys that conflict
+    compiled3, problems3 = compile_schema_internal(forbidden_keys={"ServicePayload"})
+    assert len(problems3) == 1
+    assert "ServicePayload" in problems3[0].message
+    assert "conflicts with reserved logging fields" in problems3[0].message
+
+
+def test_compile_schema_internal_caches_by_forbidden_keys(tmp_path: Path) -> None:
+    """_compile_schema_internal should cache separately for different forbidden_keys."""
+    schema_file = tmp_path / _SCHEMA_FILE_NAME
+    schema_file.write_text(
+        '{"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}}',
+        encoding="utf-8",
+    )
+
+    # Clear cache
+    with schema_loader._cache_lock:
+        schema_loader._SCHEMA_CACHE.clear()
+
+    # First compilation with no forbidden keys
+    compiled1, problems1 = compile_schema_internal(forbidden_keys=None)
+    assert not problems1
+
+    # Second compilation with same forbidden keys should return cached result
+    compiled2, problems2 = compile_schema_internal(forbidden_keys=None)
+    assert compiled2 is compiled1  # Should be the same object from cache
+    assert problems2 is problems1
+
+    # Compilation with different forbidden keys should create new entry
+    compiled3, problems3 = compile_schema_internal(forbidden_keys={"some_key"})
+    assert compiled3 is not compiled1  # Different cache entry
+    assert not problems3
