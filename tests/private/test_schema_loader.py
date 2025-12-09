@@ -212,8 +212,12 @@ def test_schema_with_only_inner_nodes_produces_empty_compiled_schema(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    # Schema with only inner nodes is valid, just empty (no problems)
-    assert problems == []
+    # Schema with empty inner node should produce problem
+    assert len(problems) > 0
+    assert any(
+        "must be either a leaf" in p.message and "or have children" in p.message
+        for p in problems
+    )
 
 
 def test_deeply_nested_schema_compiles_correctly(
@@ -1525,21 +1529,126 @@ def test_is_leaf_node_with_both_as_objects() -> None:
 
 
 def test_is_leaf_node_with_type_as_object_source_as_string() -> None:
-    """_is_leaf_node should return True when type is object but source is string."""
+    """_is_leaf_node should return False when type is object (even if source is string)."""  # noqa: E501
     value_dict = {
         "type": {"type": "str", "source": "some.type"},
         "source": "request_id",
     }
-    assert is_leaf_node(value_dict) is True
+    assert is_leaf_node(value_dict) is False
 
 
 def test_is_leaf_node_with_source_as_object_type_as_string() -> None:
-    """_is_leaf_node should return True when source is object but type is string."""
+    """_is_leaf_node should return False when source is object (even if type is string)."""  # noqa: E501
     value_dict = {
         "type": "str",
         "source": {"type": "str", "source": "some.source"},
     }
-    assert is_leaf_node(value_dict) is True
+    assert is_leaf_node(value_dict) is False
+
+
+def test_leaf_node_with_child_nodes_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leaf node with child nodes (objects) should produce problem."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {
+                    "type": "str",
+                    "source": "request_id",
+                    "child": {"type": "str", "source": "child"},  # Child node - error
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    assert any("cannot have both properties" in p.message for p in problems)
+
+
+def test_inner_node_with_type_source_as_strings_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inner node with type/source as strings should produce problem."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {
+                    "type": {
+                        "type": "str",
+                        "source": "some.type",
+                    },  # Object - makes it inner node
+                    "source": "request_id",  # String - error for inner node
+                    "child": {"type": "str", "source": "child"},  # Child node
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    # Schema is not empty because it has valid child leaves, but should have problems
+    assert any("cannot have both properties" in p.message for p in problems)
+
+
+def test_empty_node_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty node (no properties, no children) should produce problem."""
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "EmptyNode": {},  # Empty node - error
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    assert any(
+        "must be either a leaf" in p.message and "or have children" in p.message
+        for p in problems
+    )
+
+
+def test_mixed_node_with_properties_and_children_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with both properties (type/source as strings) and children should produce problem."""  # noqa: E501
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "MixedNode": {
+                    "type": "str",  # Property
+                    "source": "request_id",  # Property
+                    "child": {"type": "str", "source": "child"},  # Child - error
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    assert any(
+        "cannot have both properties" in p.message and "and children" in p.message
+        for p in problems
+    )
 
 
 def test_get_schema_path_uses_cached_missing_file_path(

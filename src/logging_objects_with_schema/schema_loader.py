@@ -16,7 +16,7 @@ import threading
 from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .errors import _SchemaProblem
 
@@ -383,6 +383,90 @@ def _is_empty_or_none(value: Any) -> bool:
     return value is None or (isinstance(value, str) and value.strip() == "")
 
 
+def _determine_node_type_and_validate(
+    value_dict: dict[str, Any],
+    path: tuple[str, ...],
+    key: str,
+    problems: list[_SchemaProblem],
+) -> tuple[Literal["leaf", "inner"] | None, bool]:
+    """Determine node type (leaf/inner) and validate node structure.
+
+    A node can be either:
+    - A leaf node: has 'type' and 'source' as strings (properties), no children
+    - An inner node: has children (any fields that are objects), no leaf properties
+
+    A node cannot have both properties and children, and cannot be empty.
+
+    Args:
+        value_dict: Dictionary containing node data.
+        path: Current path in the schema tree.
+        key: Current key being processed.
+        problems: List to collect validation problems. Validation errors are
+            automatically appended to this list when an invalid node is detected.
+
+    Returns:
+        Tuple of (node_type, is_valid) where:
+        - node_type: "leaf" for valid leaf nodes, "inner" for valid inner nodes,
+            or None if the node is invalid
+        - is_valid: True if node is valid, False if there are validation errors
+
+        When is_valid is False:
+        - node_type is always None
+        - A validation problem has been added to the problems list
+        - The caller should skip processing this node (e.g., use continue)
+    """
+    type_value = value_dict.get("type")
+    source_value = value_dict.get("source")
+    item_type_value = value_dict.get("item_type")
+
+    # Check if node has leaf properties
+    # Leaf properties are: type (required, string), source (required, string),
+    # item_type (optional, string). If type/source/item_type are objects,
+    # they are children, not properties
+    has_leaf_properties = (
+        isinstance(type_value, str)
+        or isinstance(source_value, str)
+        or isinstance(item_type_value, str)
+    )
+
+    # Check if node has children (any field that is an object/Mapping)
+    # Children can have ANY names, including type, source, item_type - this is
+    # valid for inner nodes. If type, source, or item_type are objects,
+    # they count as children
+    has_children = any(
+        isinstance(field_value, Mapping) for field_value in value_dict.values()
+    )
+
+    # Validate node structure
+    if has_leaf_properties and has_children:
+        # Node cannot have both properties and children
+        problems.append(
+            _SchemaProblem(
+                f"Invalid node at {_format_path(path, key)}: "
+                f"node cannot have both properties (type/source as strings) "
+                f"and children (object fields)"
+            ),
+        )
+        return (None, False)
+
+    if not has_leaf_properties and not has_children:
+        # Node must be either a leaf or have children
+        problems.append(
+            _SchemaProblem(
+                f"Invalid node at {_format_path(path, key)}: "
+                f"node must be either a leaf (with type/source as strings) "
+                f"or have children (object fields)"
+            ),
+        )
+        return (None, False)
+
+    # Node is valid - determine type
+    if has_leaf_properties:
+        return ("leaf", True)
+    else:  # has_children
+        return ("inner", True)
+
+
 def _is_leaf_node(value_dict: dict[str, Any]) -> bool:
     """Check if a schema node is a leaf node.
 
@@ -407,12 +491,12 @@ def _is_leaf_node(value_dict: dict[str, Any]) -> bool:
     type_value = value_dict.get("type")
     source_value = value_dict.get("source")
 
-    # Check if type is present and is a string
-    if isinstance(type_value, str):
-        return True
+    # If either field is an object (Mapping), this is an inner node, not a leaf
+    if isinstance(type_value, Mapping) or isinstance(source_value, Mapping):
+        return False
 
-    # Check if source is present and is a string
-    if isinstance(source_value, str):
+    # Check if at least one field is present and is a string
+    if isinstance(type_value, str) or isinstance(source_value, str):
         return True
 
     # Neither field is present as a string - this is an inner node
@@ -461,6 +545,9 @@ def _validate_and_create_leaf(
 
     if type_invalid or source_invalid:
         return None
+
+    # Note: Check for children is done in _determine_node_type_and_validate()
+    # before this function is called, so we don't need to check here.
 
     # Convert to string before lookup to handle cases where the JSON parser
     # might return non-string types (though this shouldn't happen with valid JSON).
@@ -572,12 +659,23 @@ def _compile_schema_tree(
         # might be a read-only Mapping (e.g., from JSON parsing).
         value_dict = dict(value)
 
-        if _is_leaf_node(value_dict):
+        # Determine node type and validate structure
+        # (checks for mixed nodes, empty nodes, etc.)
+        node_type, is_valid = _determine_node_type_and_validate(
+            value_dict, path, key, problems
+        )
+
+        if not is_valid:
+            # Node has validation errors, skip processing but continue with other nodes
+            continue
+
+        if node_type == "leaf":
+            # Process as leaf node
             leaf = _validate_and_create_leaf(value_dict, path, key, problems)
             if leaf is not None:
                 yield leaf
-        else:
-            # This is an inner node; recurse into children.
+        elif node_type == "inner":
+            # Process as inner node - recurse into children
             for child_leaf in _compile_schema_tree(value_dict, path + (key,), problems):
                 yield child_leaf
 
