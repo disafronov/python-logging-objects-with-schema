@@ -180,11 +180,27 @@ An example of a valid empty schema (no leaves, no problems):
 
 **Schema structure:**
 
-- **Inner nodes**: Objects without `type` and `source` fields (used for nesting).
-- **Leaf nodes**: Objects with both `type` and `source` fields. A valid leaf
-  must have both fields present and non-empty.
+- **Inner nodes**: Objects that contain child nodes (any fields that are objects).
+  Inner nodes cannot have `type` or `source` as strings (they can only have
+  these fields as objects, which are child nodes). Inner nodes must have at
+  least one child node.
+- **Leaf nodes**: Objects with `type` and `source` fields as strings (properties).
+  A valid leaf must have both `type` and `source` present and non-empty. Leaf
+  nodes cannot have child nodes (any fields that are objects).
+- **Node validation rules**:
+  - A node cannot be both a leaf and an inner node (cannot have both properties
+    and children simultaneously).
+  - A node cannot be empty (must be either a leaf with properties or an inner
+    node with children).
+  - Fields `type`, `source`, and `item_type` can be used as child node names
+    in inner nodes (as objects), but then they are treated as children, not
+    as leaf properties.
 - **`type`**: One of `"str"`, `"int"`, `"float"`, `"bool"`, or `"list"`.
+  Must be a string for leaf nodes.
 - **`source`**: The name of the field in `extra` from which the value is taken.
+  Must be a string for leaf nodes.
+- **`item_type`**: Optional field for list-typed leaves. Must be a string if
+  present. See "List-typed fields" section below.
 - **Root key restrictions**: Root keys cannot conflict with standard `logging`
   module fields (e.g., `name`, `levelno`, `pathname`). Such conflicts cause
   schema validation to fail.
