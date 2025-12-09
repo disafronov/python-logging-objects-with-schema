@@ -42,7 +42,7 @@ def _create_validation_error_json(field: str, error: str, value: Any) -> str:
 
 
 def _validate_list_value(
-    value: list,
+    value: list[Any],
     source: str,
     item_expected_type: type | None,
 ) -> _DataProblem | None:

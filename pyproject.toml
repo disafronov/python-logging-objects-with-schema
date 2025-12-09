@@ -27,7 +27,8 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3 :: Only",
   "Intended Audience :: Developers",
-  "Topic :: System :: Logging"
+  "Topic :: System :: Logging",
+  "Typing :: Typed"
 ]
 
   [[project.authors]]
