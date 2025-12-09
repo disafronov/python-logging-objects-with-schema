@@ -1,3 +1,14 @@
+## [0.3.0](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.2.0...v0.3.0) (2025-12-09)
+
+### Features
+
+* add type annotations and mypy support ([a800c2e](https://github.com/disafronov/python-logging-objects-with-schema/commit/a800c2eba3599910c4124f5a96c8126dc0aa6537))
+
+### Bug Fixes
+
+* **schema_loader:** enhance validation for leaf node source type ([6c89b99](https://github.com/disafronov/python-logging-objects-with-schema/commit/6c89b991673edd01f165715ce1bda01aa5f2e3fa))
+* **schema_loader:** improve validation for leaf node types ([6931b86](https://github.com/disafronov/python-logging-objects-with-schema/commit/6931b8672609b7b07c852b99c5874bcf1179caa9))
+
 ## [0.3.0-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.3.0-rc.1...v0.3.0-rc.2) (2025-12-09)
 
 ### Bug Fixes
