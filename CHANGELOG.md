@@ -1,3 +1,9 @@
+## [0.3.0-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.2.0...v0.3.0-rc.1) (2025-12-09)
+
+### Features
+
+* add type annotations and mypy support ([d907b1e](https://github.com/disafronov/python-logging-objects-with-schema/commit/d907b1e71c42efc0e54843877d4233d7e88d5f56))
+
 ## [0.2.0](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.1.4...v0.2.0) (2025-12-09)
 
 ### Features
