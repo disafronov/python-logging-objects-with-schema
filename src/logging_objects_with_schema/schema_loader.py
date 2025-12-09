@@ -524,7 +524,8 @@ def _validate_and_create_leaf(
     leaf_source = value_dict.get("source")
 
     # This is supposed to be a leaf - validate required fields first.
-    type_invalid = _is_empty_or_none(leaf_type)
+    # Type must be a string (not None, not empty, and not other types like bool/int)
+    type_invalid = _is_empty_or_none(leaf_type) or not isinstance(leaf_type, str)
     # Source must be a string (not None, not empty, and not other types like bool/int)
     source_invalid = _is_empty_or_none(leaf_source) or not isinstance(leaf_source, str)
 
@@ -567,7 +568,11 @@ def _validate_and_create_leaf(
     # to ensure element homogeneity (e.g. list[str], list[int]).
     if expected_type is list:
         item_type_name = value_dict.get("item_type")
-        item_type_invalid = _is_empty_or_none(item_type_name)
+        # Item type must be a string (not None, not empty, and not other types
+        # like bool/int)
+        item_type_invalid = _is_empty_or_none(item_type_name) or not isinstance(
+            item_type_name, str
+        )
         if item_type_invalid:
             problems.append(
                 _SchemaProblem(
@@ -675,8 +680,10 @@ def _compile_schema_tree(
             leaf = _validate_and_create_leaf(value_dict, path, key, problems)
             if leaf is not None:
                 yield leaf
-        elif node_type == "inner":
+        else:  # node_type == "inner"
             # Process as inner node - recurse into children
+            # Note: node_type can only be "leaf" or "inner" when is_valid is True.
+            # If is_valid is False, we already continue above.
             for child_leaf in _compile_schema_tree(value_dict, path + (key,), problems):
                 yield child_leaf
 
