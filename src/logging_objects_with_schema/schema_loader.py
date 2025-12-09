@@ -525,7 +525,8 @@ def _validate_and_create_leaf(
 
     # This is supposed to be a leaf - validate required fields first.
     type_invalid = _is_empty_or_none(leaf_type)
-    source_invalid = _is_empty_or_none(leaf_source)
+    # Source must be a string (not None, not empty, and not other types like bool/int)
+    source_invalid = _is_empty_or_none(leaf_source) or not isinstance(leaf_source, str)
 
     if type_invalid:
         problems.append(
