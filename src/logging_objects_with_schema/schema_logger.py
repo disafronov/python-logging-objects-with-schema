@@ -91,6 +91,8 @@ class SchemaLogger(logging.Logger):
                 Subclasses can override this method and pass their own
                 forbidden keys to the parent, merging them with keys from
                 their own subclasses if needed.
+                Note: None and empty set() are semantically equivalent - both
+                mean "no additional forbidden keys" and produce the same result.
         """
         # Validate schema before creating the logger instance to avoid
         # registering a broken logger in the logging manager cache.
