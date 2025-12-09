@@ -1497,6 +1497,51 @@ def test_is_leaf_node_with_both_none() -> None:
     assert is_leaf_node(value_dict) is False
 
 
+def test_is_leaf_node_with_type_as_object() -> None:
+    """_is_leaf_node should return False when type is an object (child node)."""
+    value_dict = {
+        "type": {"type": "str", "source": "some.type"},
+        "other": "value",
+    }
+    assert is_leaf_node(value_dict) is False
+
+
+def test_is_leaf_node_with_source_as_object() -> None:
+    """_is_leaf_node should return False when source is an object (child node)."""
+    value_dict = {
+        "source": {"type": "str", "source": "some.source"},
+        "other": "value",
+    }
+    assert is_leaf_node(value_dict) is False
+
+
+def test_is_leaf_node_with_both_as_objects() -> None:
+    """_is_leaf_node should return False when both type and source are objects."""
+    value_dict = {
+        "type": {"type": "str", "source": "some.type"},
+        "source": {"type": "str", "source": "some.source"},
+    }
+    assert is_leaf_node(value_dict) is False
+
+
+def test_is_leaf_node_with_type_as_object_source_as_string() -> None:
+    """_is_leaf_node should return True when type is object but source is string."""
+    value_dict = {
+        "type": {"type": "str", "source": "some.type"},
+        "source": "request_id",
+    }
+    assert is_leaf_node(value_dict) is True
+
+
+def test_is_leaf_node_with_source_as_object_type_as_string() -> None:
+    """_is_leaf_node should return True when source is object but type is string."""
+    value_dict = {
+        "type": "str",
+        "source": {"type": "str", "source": "some.source"},
+    }
+    assert is_leaf_node(value_dict) is True
+
+
 def test_get_schema_path_uses_cached_missing_file_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

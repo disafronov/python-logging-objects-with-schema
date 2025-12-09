@@ -386,8 +386,12 @@ def _is_empty_or_none(value: Any) -> bool:
 def _is_leaf_node(value_dict: dict[str, Any]) -> bool:
     """Check if a schema node is a leaf node.
 
-    A leaf node is identified by having either 'type' or 'source' field.
-    Inner nodes have neither of these fields.
+    A leaf node is identified by having at least one of 'type' or 'source' fields
+    that is a primitive value (not a Mapping/object). If 'type' or 'source' are
+    themselves objects, they are child nodes, not leaf properties.
+
+    Inner nodes have either no 'type'/'source' fields, or have these fields as
+    objects (child nodes) rather than primitive values.
 
     We use `.get()` with `is not None` check instead of `in` operator because:
     - A field might be present but have a None value (which indicates an error)
@@ -400,7 +404,19 @@ def _is_leaf_node(value_dict: dict[str, Any]) -> bool:
     Returns:
         True if the node is a leaf, False if it's an inner node.
     """
-    return value_dict.get("type") is not None or value_dict.get("source") is not None
+    type_value = value_dict.get("type")
+    source_value = value_dict.get("source")
+
+    # Check if type is present and is a primitive (not a Mapping/object)
+    if type_value is not None and not isinstance(type_value, Mapping):
+        return True
+
+    # Check if source is present and is a primitive (not a Mapping/object)
+    if source_value is not None and not isinstance(source_value, Mapping):
+        return True
+
+    # Neither field is present as a primitive - this is an inner node
+    return False
 
 
 def _validate_and_create_leaf(
