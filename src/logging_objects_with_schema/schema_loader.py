@@ -109,10 +109,12 @@ _TYPE_MAP: Mapping[str, type] = {
 # cache stores the result of compiling that file. Both are thread-safe and
 # use double-checked locking to avoid race conditions.
 
-# Compiled schema cache: Key is absolute schema_path, Value is tuple of
-# (_CompiledSchema, list[_SchemaProblem]). This cache stores both successful
-# compilations and failures (with problems list).
-_SCHEMA_CACHE: dict[Path, tuple[_CompiledSchema, list[_SchemaProblem]]] = {}
+# Compiled schema cache: Key is tuple of (absolute schema_path, frozenset of
+# forbidden_keys), Value is tuple of (_CompiledSchema, list[_SchemaProblem]).
+# This cache stores both successful compilations and failures (with problems list).
+_SCHEMA_CACHE: dict[
+    tuple[Path, frozenset[str]], tuple[_CompiledSchema, list[_SchemaProblem]]
+] = {}
 
 _cache_lock = threading.RLock()
 
@@ -625,11 +627,24 @@ def _get_builtin_logrecord_attributes() -> set[str]:
 
 
 def _check_root_conflicts(
-    schema_dict: Mapping[str, Any], problems: list[_SchemaProblem]
+    schema_dict: Mapping[str, Any],
+    problems: list[_SchemaProblem],
+    forbidden_keys: set[str] | None = None,
 ) -> None:
-    """Check schema root keys for conflicts with reserved logging fields."""
+    """Check schema root keys for conflicts with reserved logging fields.
 
+    Args:
+        schema_dict: The schema dictionary to check.
+        problems: List to collect validation problems.
+        forbidden_keys: Additional forbidden root keys to check against.
+            These keys are merged with builtin LogRecord attributes.
+            Builtin keys cannot be replaced, only supplemented.
+    """
+    # Builtin keys always present, cannot be replaced
     forbidden_root_keys = _get_builtin_logrecord_attributes()
+    # Merge with additional forbidden keys if provided
+    if forbidden_keys:
+        forbidden_root_keys = forbidden_root_keys | forbidden_keys
 
     for key in schema_dict.keys():
         if key in forbidden_root_keys:
@@ -640,7 +655,9 @@ def _check_root_conflicts(
             )
 
 
-def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
+def _compile_schema_internal(
+    forbidden_keys: set[str] | None = None,
+) -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     """Compile JSON schema into ``_CompiledSchema`` and collect all problems.
 
     The function loads the raw JSON schema, validates its structure, checks
@@ -649,13 +666,19 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     discovered during this process are reported as :class:`_SchemaProblem`
     instances.
 
-    Results are cached process-wide: the cache key is the absolute schema
-    file path and the value is a tuple ``(_CompiledSchema, list[_SchemaProblem])``.
-    Once a schema for a given path has been observed (including the cases when
-    it is missing or invalid), subsequent calls always return the cached result
-    without re-reading or re-compiling the schema. To pick up on-disk changes
-    to the schema, the application must restart the process. See the README
-    section \"Schema caching and thread safety\" for more details.
+    Results are cached process-wide: the cache key is a tuple of the absolute
+    schema file path and the set of additional forbidden keys. The value is a
+    tuple ``(_CompiledSchema, list[_SchemaProblem])``. Once a schema for a
+    given path and forbidden keys set has been observed (including the cases
+    when it is missing or invalid), subsequent calls always return the cached
+    result without re-reading or re-compiling the schema. To pick up on-disk
+    changes to the schema, the application must restart the process. See the
+    README section \"Schema caching and thread safety\" for more details.
+
+    Args:
+        forbidden_keys: Additional forbidden root keys to check against.
+            These keys are merged with builtin LogRecord attributes.
+            Builtin keys cannot be replaced, only supplemented.
 
     This function never raises exceptions. It always returns the best-effort
     compiled schema together with a list of problems detected during processing
@@ -664,17 +687,18 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     Performance considerations:
         First compilation of a schema involves file I/O, JSON parsing, and tree
         traversal. For typical schemas (< 1000 nodes), this takes < 10ms. All
-        subsequent calls for the same schema path return immediately from cache
-        (< 0.1ms). The cache is process-wide and persists for the application
-        lifetime.
+        subsequent calls for the same schema path and forbidden keys return
+        immediately from cache (< 0.1ms). The cache is process-wide and persists
+        for the application lifetime.
 
     Limitations:
         - Schema changes on disk are not automatically reloaded; the application
           must be restarted to pick up changes
         - Very large schemas (> 10,000 nodes) may cause noticeable compilation
           overhead on first load, but this is uncommon in practice
-        - The cache uses absolute file paths as keys, so schema files must be
-          accessible via the same path throughout the application lifetime
+        - The cache uses absolute file paths and forbidden keys sets as keys, so
+          schema files must be accessible via the same path throughout the
+          application lifetime
 
     Note:
         This function is used internally by :class:`SchemaLogger` and by the
@@ -685,12 +709,14 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
         Tuple of (_CompiledSchema, list[_SchemaProblem]).
     """
     schema_path = _get_schema_path()
+    # Create cache key that includes forbidden keys
+    cache_key = (schema_path, frozenset(forbidden_keys or ()))
 
     # Fast-path: First check (with lock for thread-safety) if we have already attempted
-    # to compile schema for this path. This provides thread-safe cache access
-    # in the common case when the schema is already cached.
+    # to compile schema for this path and forbidden keys set. This provides thread-safe
+    # cache access in the common case when the schema is already cached.
     with _cache_lock:
-        cached = _SCHEMA_CACHE.get(schema_path)
+        cached = _SCHEMA_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
@@ -712,16 +738,16 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
         # thread might have compiled the schema (or handled the same error) while
         # we were processing the exception. If so, use the cached result.
         with _cache_lock:
-            cached = _SCHEMA_CACHE.get(schema_path)
+            cached = _SCHEMA_CACHE.get(cache_key)
             if cached is not None:
                 return cached
-            _SCHEMA_CACHE[schema_path] = result
+            _SCHEMA_CACHE[cache_key] = result
         return result
 
     # Check root key conflicts before compiling the tree. This allows us to
     # catch conflicts early and report them as schema problems. We do this
     # before tree compilation to avoid unnecessary work if there are conflicts.
-    _check_root_conflicts(raw_schema, problems)
+    _check_root_conflicts(raw_schema, problems, forbidden_keys)
 
     # Compile the schema tree into leaves. Each root key becomes a separate
     # tree that we compile recursively. Problems are collected as we go.
@@ -748,9 +774,9 @@ def _compile_schema_internal() -> tuple[_CompiledSchema, list[_SchemaProblem]]:
     # instead of overwriting it with our own (which might be different if the file
     # was modified between reads).
     with _cache_lock:
-        cached = _SCHEMA_CACHE.get(schema_path)
+        cached = _SCHEMA_CACHE.get(cache_key)
         if cached is not None:
             return cached
-        _SCHEMA_CACHE[schema_path] = result
+        _SCHEMA_CACHE[cache_key] = result
 
     return result
