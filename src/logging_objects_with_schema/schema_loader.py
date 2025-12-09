@@ -639,10 +639,16 @@ def _check_root_conflicts(
         forbidden_keys: Additional forbidden root keys to check against.
             These keys are merged with builtin LogRecord attributes.
             Builtin keys cannot be replaced, only supplemented.
+            Note: None and empty set() are semantically equivalent - both
+            mean "no additional forbidden keys" and produce the same result.
     """
     # Builtin keys always present, cannot be replaced
     forbidden_root_keys = _get_builtin_logrecord_attributes()
-    # Merge with additional forbidden keys if provided
+    # Merge with additional forbidden keys if provided.
+    # We use `if forbidden_keys:` instead of `if forbidden_keys is not None:` because
+    # both None and empty set() semantically mean "no additional forbidden keys".
+    # This check treats them equivalently: None is falsy, and empty set() is also
+    # falsy, so both cases skip the merge operation, which is the correct behavior.
     if forbidden_keys:
         forbidden_root_keys = forbidden_root_keys | forbidden_keys
 
@@ -679,6 +685,9 @@ def _compile_schema_internal(
         forbidden_keys: Additional forbidden root keys to check against.
             These keys are merged with builtin LogRecord attributes.
             Builtin keys cannot be replaced, only supplemented.
+            Note: None and empty set() are semantically equivalent - both
+            mean "no additional forbidden keys" and produce the same result.
+            They also produce the same cache key, so cached results are shared.
 
     This function never raises exceptions. It always returns the best-effort
     compiled schema together with a list of problems detected during processing
@@ -709,7 +718,14 @@ def _compile_schema_internal(
         Tuple of (_CompiledSchema, list[_SchemaProblem]).
     """
     schema_path = _get_schema_path()
-    # Create cache key that includes forbidden keys
+    # Create cache key that includes forbidden keys.
+    # We use `frozenset(forbidden_keys or ())` instead of checking for None explicitly
+    # because both None and empty set() should produce the same cache key (frozenset()).
+    # This is semantically correct: both None and set() mean "no additional forbidden
+    # keys", so they should share the same cached compilation result. The `or ()`
+    # operator converts None to empty tuple, which frozenset() then converts to empty
+    # frozenset, and empty set() also becomes empty frozenset, ensuring cache key
+    # consistency.
     cache_key = (schema_path, frozenset(forbidden_keys or ()))
 
     # Fast-path: First check (with lock for thread-safety) if we have already attempted

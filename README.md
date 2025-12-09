@@ -323,3 +323,5 @@ All keys are merged together - they are not replaced, only supplemented.
   if it wants to propagate keys from its own subclasses
 - The `forbidden_keys` parameter is optional - if not provided, only builtin
   keys are used, maintaining 100% backward compatibility
+- `None` and empty `set()` are semantically equivalent for `forbidden_keys` -
+  both mean "no additional forbidden keys" and produce the same result
