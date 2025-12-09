@@ -1898,7 +1898,7 @@ def test_node_with_type_as_number_produces_problem(
 
     This tests the edge case where type field has a non-string, non-object value.
     The node will be determined as "leaf" (because source is a string), but
-    _validate_and_create_leaf should reject it because the type value is invalid.
+    _validate_and_create_leaf should reject it because type must be a string.
     """
     monkeypatch.chdir(tmp_path)
     _write_schema(
@@ -1913,8 +1913,35 @@ def test_node_with_type_as_number_produces_problem(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    # Should have problem because type '123' is unknown
-    assert any("Unknown type" in p.message and "123" in p.message for p in problems)
+    # Should have problem because type must be a string, not a number
+    assert any("type cannot be None or empty" in p.message for p in problems)
+
+
+def test_node_with_type_as_boolean_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with type as boolean (non-string, non-object) should produce problem.
+
+    This tests the edge case where type field has a non-string, non-object value.
+    The node will be determined as "leaf" (because source is a string), but
+    _validate_and_create_leaf should reject it because type must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": True, "source": "request_id"},  # type is boolean
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because type must be a string, not boolean
+    assert any("type cannot be None or empty" in p.message for p in problems)
 
 
 def test_node_with_source_as_boolean_produces_problem(
@@ -1941,6 +1968,33 @@ def test_node_with_source_as_boolean_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because source must be a string, not boolean
+    assert any("source cannot be None or empty" in p.message for p in problems)
+
+
+def test_node_with_source_as_number_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with source as number (non-string, non-object) should produce problem.
+
+    This tests the edge case where source field has a non-string, non-object value.
+    The node will be determined as "leaf" (because type is a string), but
+    _validate_and_create_leaf should reject it because source must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": "str", "source": 123},  # source is number
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because source must be a string, not number
     assert any("source cannot be None or empty" in p.message for p in problems)
 
 
@@ -1992,3 +2046,122 @@ def test_determine_node_type_with_item_type_only() -> None:
     assert node_type == "leaf"
     assert is_valid is True
     assert problems == []  # No problems at this stage, validation happens later
+
+
+def test_node_with_item_type_as_number_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with item_type as number (non-string) should produce problem.
+
+    This tests the edge case where item_type field has a non-string value.
+    The node will be determined as "leaf" (because type and source are strings),
+    but _validate_and_create_leaf should reject it because item_type must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "Tags": {
+                    "type": "list",
+                    "source": "tags",
+                    "item_type": 123,  # item_type is number
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because item_type must be a string, not a number
+    assert any("item_type is required for list type" in p.message for p in problems)
+
+
+def test_node_with_item_type_as_boolean_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with item_type as boolean (non-string) should produce problem.
+
+    This tests the edge case where item_type field has a non-string value.
+    The node will be determined as "leaf" (because type and source are strings),
+    but _validate_and_create_leaf should reject it because item_type must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "Tags": {
+                    "type": "list",
+                    "source": "tags",
+                    "item_type": True,  # item_type is boolean
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because item_type must be a string, not a boolean
+    assert any("item_type is required for list type" in p.message for p in problems)
+
+
+def test_node_with_type_as_list_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with type as list (non-string, non-Mapping) should produce problem.
+
+    This tests the edge case where type field has a list value (not a Mapping).
+    The node will be determined as "leaf" (because source is a string), but
+    _validate_and_create_leaf should reject it because type must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": ["str"], "source": "request_id"},  # type is list
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because type must be a string, not a list
+    assert any("type cannot be None or empty" in p.message for p in problems)
+
+
+def test_node_with_source_as_list_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with source as list (non-string, non-Mapping) should produce problem.
+
+    This tests the edge case where source field has a list value (not a Mapping).
+    The node will be determined as "leaf" (because type is a string), but
+    _validate_and_create_leaf should reject it because source must be a string.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {
+                    "type": "str",
+                    "source": ["request_id"],
+                },  # source is list
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    # Should have problem because source must be a string, not a list
+    assert any("source cannot be None or empty" in p.message for p in problems)
