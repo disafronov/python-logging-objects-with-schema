@@ -250,3 +250,76 @@ Example:
 
 With `extra={"request_id": "abc-123"}`, the value appears in both
 `ServicePayload.RequestID` and `ServicePayload.Metadata.ID`.
+
+## Inheritance and custom forbidden root keys
+
+`SchemaLogger` supports inheritance, allowing subclasses to add additional
+forbidden root keys for schema validation. This is useful when you need to
+prevent certain root keys from being used in your schema beyond the builtin
+`logging.LogRecord` attributes.
+
+### Basic inheritance
+
+Each subclass can pass the `forbidden_keys` parameter to the parent's
+`__init__()` method. The builtin set of forbidden keys (standard `logging.LogRecord`
+attributes) is always present and cannot be replaced - additional keys are
+merged with the builtin set.
+
+Example:
+
+```python
+from logging_objects_with_schema import SchemaLogger
+import logging
+
+class MyLogger(SchemaLogger):
+    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+        # Add custom forbidden keys
+        super().__init__(name, level, forbidden_keys={"custom_forbidden_key"})
+```
+
+### Multi-level inheritance
+
+When creating a hierarchy of loggers, each subclass can pass `forbidden_keys`
+from its own subclasses to the parent, merging them with its own set. The
+library does not automatically propagate keys up the inheritance chain - each
+subclass must implement this logic itself.
+
+Example:
+
+```python
+from logging_objects_with_schema import SchemaLogger
+import logging
+
+class ParentLogger(SchemaLogger):
+    def __init__(
+        self, name: str, level: int = logging.NOTSET, forbidden_keys: set[str] | None = None
+    ) -> None:
+        # Merge parent's keys with keys from child
+        parent_keys = {"parent_forbidden_key"}
+        if forbidden_keys:
+            parent_keys = parent_keys | forbidden_keys
+        super().__init__(name, level, forbidden_keys=parent_keys)
+
+class ChildLogger(ParentLogger):
+    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+        # Pass child's keys to parent, which will merge them
+        super().__init__(name, level, forbidden_keys={"child_forbidden_key"})
+```
+
+In this example, the final set of forbidden keys will be:
+
+- Builtin `logging.LogRecord` attributes (always present)
+- `parent_forbidden_key` (from `ParentLogger`)
+- `child_forbidden_key` (from `ChildLogger`)
+
+All keys are merged together - they are not replaced, only supplemented.
+
+### Important notes
+
+- The builtin set of forbidden keys (standard `logging.LogRecord` attributes)
+  is always present and cannot be replaced or removed
+- Additional forbidden keys are merged with the builtin set, not replaced
+- Each subclass must implement the logic to pass `forbidden_keys` to its parent
+  if it wants to propagate keys from its own subclasses
+- The `forbidden_keys` parameter is optional - if not provided, only builtin
+  keys are used, maintaining 100% backward compatibility

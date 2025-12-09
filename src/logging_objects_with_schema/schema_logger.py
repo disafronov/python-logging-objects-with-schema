@@ -69,7 +69,12 @@ class SchemaLogger(logging.Logger):
         >>> logger.info("request processed", extra={"request_id": "abc-123"})
     """
 
-    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+    def __init__(
+        self,
+        name: str,
+        level: int = logging.NOTSET,
+        forbidden_keys: set[str] | None = None,
+    ) -> None:
         """Initialise the schema-aware logger.
 
         The schema is compiled once during construction. If any
@@ -80,12 +85,18 @@ class SchemaLogger(logging.Logger):
         Args:
             name: Logger name (same as :class:`logging.Logger`).
             level: Logger level (same as :class:`logging.Logger`).
+            forbidden_keys: Additional forbidden root keys to check against.
+                These keys are merged with builtin LogRecord attributes.
+                Builtin keys cannot be replaced, only supplemented.
+                Subclasses can override this method and pass their own
+                forbidden keys to the parent, merging them with keys from
+                their own subclasses if needed.
         """
         # Validate schema before creating the logger instance to avoid
         # registering a broken logger in the logging manager cache.
         # Schema is compiled and cached first, then problems are checked.
         try:
-            compiled, problems = _compile_schema_internal()
+            compiled, problems = _compile_schema_internal(forbidden_keys)
         except (OSError, ValueError, RuntimeError) as exc:
             # Convert system-level exceptions to _SchemaProblem so they can be
             # handled the same way as schema validation problems.
