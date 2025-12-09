@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess  # nosec B404
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,7 +25,7 @@ def test_mypy_type_checking() -> None:
     package_dir = Path(__file__).parent.parent / "src" / "logging_objects_with_schema"
 
     # Run mypy on the package directory
-    result = subprocess.run(  # nosec B603
+    result = subprocess.run(
         [
             sys.executable,
             "-m",
@@ -48,7 +48,7 @@ def test_mypy_strict_type_checking() -> None:
     package_dir = Path(__file__).parent.parent / "src" / "logging_objects_with_schema"
 
     # Run mypy in strict mode on the package directory
-    result = subprocess.run(  # nosec B603
+    result = subprocess.run(
         [
             sys.executable,
             "-m",
