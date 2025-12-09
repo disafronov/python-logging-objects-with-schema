@@ -94,8 +94,7 @@ warn_unreachable = true
 strict_equality = true
 
 [tool.bandit]
-skips = [ "B101", "B601" ]
-exclude_dirs = [ ".venv", "__pycache__", ".git", "htmlcov" ]
+exclude_dirs = [ ".venv", "__pycache__", ".git", "htmlcov", "tests" ]
 
 [tool.coverage.run]
 source = [ "src" ]
