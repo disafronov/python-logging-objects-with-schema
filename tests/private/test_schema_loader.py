@@ -1599,6 +1599,38 @@ def test_inner_node_with_type_source_as_strings_produces_problem(
     assert any("cannot have both properties" in p.message for p in problems)
 
 
+def test_leaf_node_with_type_string_source_object_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leaf node with type as string and source as object should produce problem.
+
+    This tests the edge case where type is a string (leaf property) but source
+    is an object (child). This should be detected as a mixed node and produce
+    an error "cannot have both properties and children".
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {
+                    "type": "str",  # String - leaf property
+                    "source": {
+                        "type": "str",
+                        "source": "some.source",
+                    },  # Object - child, error for leaf node
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert compiled.is_empty
+    assert any("cannot have both properties" in p.message for p in problems)
+
+
 def test_empty_node_produces_problem(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
