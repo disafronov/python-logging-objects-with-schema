@@ -2142,6 +2142,40 @@ def test_node_with_item_type_as_boolean_produces_problem(
     assert any("item_type is required for list type" in p.message for p in problems)
 
 
+def test_node_with_item_type_as_object_is_determined_as_inner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Node with item_type as object (Mapping) should be determined as inner node.
+
+    This tests that when item_type is an object (Mapping), it counts as a child,
+    not as a leaf property. The node should be determined as "inner" and the
+    nested structure should be processed correctly.
+    """
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "Tags": {
+                    "item_type": {
+                        "type": "str",
+                        "source": "some.item_type",
+                    },  # item_type is object - should be treated as child
+                },
+            },
+        },
+    )
+
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    # Node should be determined as inner, not leaf
+    # Should have valid child leaves from the nested structure
+    assert not compiled.is_empty
+    assert any(leaf.source == "some.item_type" for leaf in compiled.leaves)
+    assert problems == []
+
+
 def test_node_with_type_as_list_produces_problem(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
