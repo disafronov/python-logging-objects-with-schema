@@ -1649,8 +1649,11 @@ def test_check_root_conflicts_merges_builtin_and_additional_keys() -> None:
     assert any("custom_key" in msg and "conflicts" in msg for msg in problem_messages)
 
 
-def test_compile_schema_internal_with_forbidden_keys(tmp_path: Path) -> None:
+def test_compile_schema_internal_with_forbidden_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """_compile_schema_internal should accept and use forbidden_keys parameter."""
+    monkeypatch.chdir(tmp_path)
     schema_file = tmp_path / _SCHEMA_FILE_NAME
     schema_file.write_text(
         '{"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}}',
@@ -1676,8 +1679,11 @@ def test_compile_schema_internal_with_forbidden_keys(tmp_path: Path) -> None:
     assert "conflicts with reserved logging fields" in problems3[0].message
 
 
-def test_compile_schema_internal_caches_by_forbidden_keys(tmp_path: Path) -> None:
+def test_compile_schema_internal_caches_by_forbidden_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """_compile_schema_internal should cache separately for different forbidden_keys."""
+    monkeypatch.chdir(tmp_path)
     schema_file = tmp_path / _SCHEMA_FILE_NAME
     schema_file.write_text(
         '{"ServicePayload": {"RequestID": {"type": "str", "source": "request_id"}}}',
