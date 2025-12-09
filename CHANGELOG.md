@@ -1,3 +1,9 @@
+## [0.2.0](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.1.4...v0.2.0) (2025-12-09)
+
+### Features
+
+* **schema_logger:** add support for custom forbidden keys in SchemaLogger ([90ab11a](https://github.com/disafronov/python-logging-objects-with-schema/commit/90ab11ac94bf2914452f934b35f8e64aef0ad6fc))
+
 ## [0.2.0-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.1.4...v0.2.0-rc.1) (2025-12-09)
 
 ### Features
