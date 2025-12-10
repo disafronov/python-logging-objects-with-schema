@@ -73,3 +73,10 @@ repos:
         language: system
         entry: make test
         pass_filenames: false
+
+      - id: make-dead-code
+        name: make dead-code (pre-push)
+        stages: [pre-push]
+        language: system
+        entry: make dead-code
+        pass_filenames: false
