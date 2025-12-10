@@ -31,12 +31,11 @@ jobs:
         env:
           UV_PYTHON: ${{ matrix.python-version }}
 
-      - name: Run linters
-        run: make lint
+      - name: Run all checks
+        run: make all
         env:
           UV_PYTHON: ${{ matrix.python-version }}
 
-      - name: Run tests
-        run: make test
-        env:
-          UV_PYTHON: ${{ matrix.python-version }}
+      - name: Check if code was reformatted
+        if: always()
+        run: git diff --exit-code
