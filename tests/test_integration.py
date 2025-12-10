@@ -216,8 +216,15 @@ def test_schema_file_permission_error_terminates_application(
     )
 
     schema_file = tmp_path / _SCHEMA_FILE_NAME
+    # type: ignore[attr-defined] - schema_loader.Path is an alias for pathlib.Path.
+    # Mypy doesn't always correctly resolve attribute access through module aliases,
+    # even though the open method exists on pathlib.Path.
     original_open = schema_loader.Path.open  # type: ignore[attr-defined]
 
+    # type: ignore[override] - This function replaces Path.open in tests but uses
+    # *args, **kwargs instead of the exact original method signature for flexibility.
+    # Mypy considers this a signature mismatch when overriding, but it's acceptable
+    # for test mocks.
     def fake_open(self, *args, **kwargs):  # type: ignore[override]
         if self == schema_file:
             raise PermissionError("permission denied")
