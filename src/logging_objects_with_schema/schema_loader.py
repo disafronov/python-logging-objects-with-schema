@@ -177,23 +177,30 @@ def _check_cached_found_file_path() -> Path | None:
     When a schema file was found, its absolute path is cached as CWD-independent.
     This function checks if the cached path still exists on disk.
 
+    Note: This function must be called while holding _path_cache_lock.
+
     Returns:
         Cached path if file still exists, None if file was deleted (cache invalidated).
     """
     global _resolved_schema_path
 
-    with _path_cache_lock:
-        if _resolved_schema_path is None:
-            return None
-
-        # Schema file was found, absolute path doesn't depend on CWD
-        # Return it if it still exists
-        if _resolved_schema_path.exists():
-            return _resolved_schema_path
-
-        # Cached file no longer exists; invalidate cache so caller will re-search
-        _resolved_schema_path = None
+    if _resolved_schema_path is None:
         return None
+
+    # Check if this is actually a found file cache (not missing file cache)
+    # by checking _cached_cwd. We don't need 'global' here since we only read it.
+    if _cached_cwd is not None:
+        # This path was cached as missing file, not found file
+        return None
+
+    # Schema file was found, absolute path doesn't depend on CWD
+    # Return it if it still exists
+    if _resolved_schema_path.exists():
+        return _resolved_schema_path
+
+    # Cached file no longer exists; invalidate cache so caller will re-search
+    _resolved_schema_path = None
+    return None
 
 
 def _check_cached_missing_file_path() -> Path | None:
@@ -202,26 +209,27 @@ def _check_cached_missing_file_path() -> Path | None:
     When a schema file was not found, a path based on CWD is cached.
     This function checks if CWD has changed since caching.
 
+    Note: This function must be called while holding _path_cache_lock.
+
     Returns:
         Cached path if CWD unchanged, None if CWD changed (cache invalidated).
     """
     global _resolved_schema_path, _cached_cwd
 
-    with _path_cache_lock:
-        if _resolved_schema_path is None or _cached_cwd is None:
-            return None
+    if _resolved_schema_path is None or _cached_cwd is None:
+        return None
 
-        # Cached path is based on CWD when file was not found,
-        # check if CWD changed
-        current_cwd = _get_current_working_directory()
-        if current_cwd != _cached_cwd:
-            # CWD changed, invalidate cache and re-search from new CWD
-            _resolved_schema_path = None
-            _cached_cwd = None
-            return None
+    # Cached path is based on CWD when file was not found,
+    # check if CWD changed
+    current_cwd = _get_current_working_directory()
+    if current_cwd != _cached_cwd:
+        # CWD changed, invalidate cache and re-search from new CWD
+        _resolved_schema_path = None
+        _cached_cwd = None
+        return None
 
-        # CWD unchanged, return cached path
-        return _resolved_schema_path
+    # CWD unchanged, return cached path
+    return _resolved_schema_path
 
 
 def _cache_and_return_found_path(found_path: Path) -> Path:
