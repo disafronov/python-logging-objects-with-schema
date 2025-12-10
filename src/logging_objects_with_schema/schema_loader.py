@@ -800,8 +800,8 @@ def _compile_schema_internal(
     given path and forbidden keys set has been observed (including the cases
     when it is missing or invalid), subsequent calls always return the cached
     result without re-reading or re-compiling the schema. To pick up on-disk
-    changes to the schema, the application must restart the process. See the
-    README section \"Schema caching and thread safety\" for more details.
+    changes to the schema, the application must restart the process. The schema
+    is cached process-wide and is thread-safe.
 
     Args:
         forbidden_keys: Additional forbidden root keys to check against.
