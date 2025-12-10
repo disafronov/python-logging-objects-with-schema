@@ -1,3 +1,9 @@
+## [0.4.0](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.3.1...v0.4.0) (2025-12-10)
+
+### Features
+
+* update Makefile and GitHub workflow for dependency installation ([96a61aa](https://github.com/disafronov/python-logging-objects-with-schema/commit/96a61aace00e15b36ba8f47e17c52b3cb81f4de7))
+
 ## [0.4.0-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.3.1...v0.4.0-rc.1) (2025-12-10)
 
 ### Features
