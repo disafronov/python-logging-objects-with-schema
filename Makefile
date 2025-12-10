@@ -42,7 +42,7 @@ test-coverage: ## Run tests with coverage
 	$(PYTEST_CMD) $(COVERAGE_OPTS)
 
 # Combined operations
-all: format lint test ## Run format, lint, and test
+all: format lint test dead-code ## Run format, lint, test, and dead-code check
 	@echo "All checks completed successfully!"
 
 # Maintenance
