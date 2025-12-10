@@ -3,7 +3,7 @@ PYTEST_CMD = uv run python -m pytest -v
 COVERAGE_OPTS = --cov --cov-report=term-missing --cov-report=html
 
 # Phony targets
-.PHONY: all clean format help install lint test test-coverage
+.PHONY: all clean dead-code format help install lint test test-coverage
 
 # Default target
 help: ## Show this help message
@@ -27,6 +27,10 @@ format: ## Format code
 lint: ## Run linting tools
 	@echo "Running linting tools..."
 	uv run black --check . && uv run isort --check-only . && uv run flake8 . && uv run mypy . && uv run bandit -r -c pyproject.toml .
+
+dead-code: ## Check for dead code using vulture
+	@echo "Checking for dead code..."
+	uv run vulture
 
 # Testing
 test: ## Run tests
