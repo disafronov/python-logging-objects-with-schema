@@ -45,7 +45,8 @@ classifiers = [
   "flake8-pyproject>=1.2.3",
   "mypy>=1.18.1",
   "bandit>=1.8.6",
-  "pre-commit>=3.5.0"
+  "pre-commit>=3.5.0",
+  "vulture>=2.0.0"
 ]
 
   [project.urls]
@@ -115,3 +116,9 @@ skip_covered = false
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[tool.vulture]
+min_confidence = 80
+exclude = ["tests", ".venv", "__pycache__"]
+ignore_names = ["cls"]  # Pydantic validators use @classmethod even if cls is not used
+paths = ["src"]
