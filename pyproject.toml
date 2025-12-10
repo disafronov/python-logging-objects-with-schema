@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "logging-objects-with-schema"
-version = "0.3.0"
+version = "0.3.1rc1"
 description = "Proxy logging wrapper that validates extra fields against a JSON schema."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -119,6 +119,6 @@ directory = "htmlcov"
 
 [tool.vulture]
 min_confidence = 80
-exclude = ["__pycache__"]
-ignore_names = ["cls"]  # Pydantic validators use @classmethod even if cls is not used
-paths = ["src"]
+exclude = [ "__pycache__" ]
+ignore_names = [ "cls" ]
+paths = [ "src" ]
