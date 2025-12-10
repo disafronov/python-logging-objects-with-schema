@@ -121,4 +121,4 @@ directory = "htmlcov"
 min_confidence = 80
 exclude = [ "__pycache__" ]
 ignore_names = [ "cls" ]
-paths = [ "src" ]
+paths = [ "src", "tests" ]
