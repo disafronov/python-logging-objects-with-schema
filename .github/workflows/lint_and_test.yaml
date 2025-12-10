@@ -27,7 +27,7 @@ jobs:
           cache-suffix: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev --python ${{ matrix.python-version }}
+        run: uv sync --python ${{ matrix.python-version }}
         env:
           UV_PYTHON: ${{ matrix.python-version }}
 

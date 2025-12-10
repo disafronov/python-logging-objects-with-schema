@@ -15,7 +15,7 @@ help: ## Show this help message
 # Development
 install: ## Install dependencies
 	@echo "Installing dependencies..."
-	uv sync --extra dev
+	uv sync
 	@echo "Installing pre-commit hooks..."
 	uv run pre-commit install
 
