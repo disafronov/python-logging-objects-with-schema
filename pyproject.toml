@@ -119,6 +119,6 @@ directory = "htmlcov"
 
 [tool.vulture]
 min_confidence = 80
-exclude = ["tests", ".venv", "__pycache__"]
+exclude = ["__pycache__"]
 ignore_names = ["cls"]  # Pydantic validators use @classmethod even if cls is not used
 paths = ["src"]
