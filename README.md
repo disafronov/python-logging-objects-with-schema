@@ -341,3 +341,5 @@ All keys are merged together - they are not replaced, only supplemented.
   keys are used, maintaining 100% backward compatibility
 - `None` and empty `set()` are semantically equivalent for `forbidden_keys` -
   both mean "no additional forbidden keys" and produce the same result
+
+<!--placeholder -->
