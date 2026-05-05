@@ -28,6 +28,9 @@ systems) can rely on a consistent log structure.
   problem.
 - Any mismatch between runtime values and the declared types (wrong types,
   `None` values, disallowed list elements) is also treated as a data error.
+  Type checks use `type()`, not `isinstance()`: `bool` is **not** accepted
+  where `int` is declared, and `int` is **not** accepted where `float` is
+  declared. There are no implicit type conversions.
 - All validation problems are aggregated and logged as a single ERROR message
   **after** the log record has been emitted, ensuring 100% compatibility with
   standard logger behavior (no exceptions are raised).
