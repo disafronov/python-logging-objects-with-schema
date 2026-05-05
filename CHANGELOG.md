@@ -1,3 +1,19 @@
+## [1.0.0](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.1...v1.0.0) (2026-05-05)
+
+### ⚠ BREAKING CHANGES
+
+* first stable release, no longer considered experimental
+
+Signed-off-by: Dmitrii Safronov <zimniy@cyberbrain.cc>
+
+### Features
+
+* promote to stable 1.0.0 ([7af6b32](https://github.com/disafronov/python-logging-objects-with-schema/commit/7af6b32860ac9791be9cf1ac027e4c4ba09f01c2))
+
+### Bug Fixes
+
+* enforce non-empty strings for type and source fields ([dcd1dfc](https://github.com/disafronov/python-logging-objects-with-schema/commit/dcd1dfc760f0286659ce848a1bd2fd6b45553f4e))
+
 ## [1.0.0-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.2-rc.2...v1.0.0-rc.1) (2026-05-05)
 
 ### ⚠ BREAKING CHANGES
