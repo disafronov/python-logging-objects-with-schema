@@ -114,7 +114,7 @@ _TYPE_MAP: Mapping[str, type] = {
 # 2. Compiled schema cache (_SCHEMA_CACHE): Caches the compiled schema and
 #    validation problems for a given schema file path. This avoids re-parsing
 #    and re-compiling the schema JSON on every logger creation. The cache key
-#    is the absolute schema file path from the path cache.
+#    is a tuple of (absolute schema file path, frozenset of forbidden_keys).
 #
 # These caches work together: path cache finds the file location, compiled
 # cache stores the result of compiling that file. Both are thread-safe and
@@ -137,9 +137,10 @@ _resolved_schema_path: Path | None = None
 # was not found.
 _cached_cwd: Path | None = None
 # RLock for thread-safe access to path cache variables.
-# RLock (not Lock) is needed because helper functions (_check_cached_found_file_path,
-# _check_cached_missing_file_path) are called from _get_schema_path() which already
-# holds the lock, and these helpers also need to acquire the lock.
+# RLock (not Lock) allows the same thread to acquire the lock multiple times without
+# deadlocking, which guards against any future refactoring where a helper might
+# independently acquire the lock. Currently, helpers are always called while the
+# caller already holds the lock and do not re-acquire it themselves.
 _path_cache_lock = threading.RLock()
 
 
