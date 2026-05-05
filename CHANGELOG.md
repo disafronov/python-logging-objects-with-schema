@@ -1,3 +1,15 @@
+## [1.0.0-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.2-rc.2...v1.0.0-rc.1) (2026-05-05)
+
+### ⚠ BREAKING CHANGES
+
+* first stable release, no longer considered experimental
+
+Signed-off-by: Dmitrii Safronov <zimniy@cyberbrain.cc>
+
+### Features
+
+* promote to stable 1.0.0 ([1fdd2ec](https://github.com/disafronov/python-logging-objects-with-schema/commit/1fdd2ec40dad460c0bddcf65c6961ef5357c878a))
+
 ## [0.4.2-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.2-rc.1...v0.4.2-rc.2) (2026-05-05)
 
 ### Bug Fixes
