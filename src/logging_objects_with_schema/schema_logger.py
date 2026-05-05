@@ -35,6 +35,8 @@ def _log_schema_problems_and_exit(problems: list[_SchemaProblem]) -> None:
     error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
     sys.stderr.write(error_msg)
     sys.stderr.flush()
+    # os._exit skips atexit/finally — prevents cleanup code from touching a
+    # broken logger that was never fully registered.
     os._exit(1)
 
 
