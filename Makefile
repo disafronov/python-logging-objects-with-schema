@@ -1,3 +1,6 @@
+# Python version is pinned via `.python-version` (used by uv and CI).
+PYTHON_VERSION := $(shell tr -d '[:space:]' < .python-version)
+
 # Variables
 PYTEST_CMD = uv run python -m pytest -v
 COVERAGE_OPTS = --cov --cov-report=term-missing --cov-report=html
@@ -15,7 +18,8 @@ help: ## Show this help message
 # Development
 install: ## Install dependencies
 	@echo "Installing dependencies..."
-	uv sync
+	uv python install $(PYTHON_VERSION)
+	uv sync --python $(PYTHON_VERSION)
 	@echo "Installing pre-commit hooks..."
 	uv run pre-commit install
 
