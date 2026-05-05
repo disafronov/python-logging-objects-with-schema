@@ -1,7 +1,5 @@
 """Tests for mypy type checking support."""
 
-from __future__ import annotations
-
 import subprocess
 import sys
 from pathlib import Path

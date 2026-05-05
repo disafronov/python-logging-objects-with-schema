@@ -1,7 +1,5 @@
 """Tests for errors module private classes."""
 
-from __future__ import annotations
-
 import json
 
 from logging_objects_with_schema.errors import _DataProblem, _SchemaProblem

@@ -4,8 +4,6 @@ This module provides the core function for applying a compiled schema
 to user-provided extra fields, used by SchemaLogger.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
