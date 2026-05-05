@@ -215,45 +215,9 @@ class SchemaLogger(logging.Logger):
                     fn, lno, func, sinfo = self.findCaller(
                         stack_info=False, stacklevel=stacklevel + 1
                     )
-            # Format error message as JSON for machine processing.
-            # Each _DataProblem.message is already a JSON string (created by
-            # _create_validation_error_json) with structure:
-            #   {"field": "...", "error": "...", "value": "..."}
-            # We parse them back to dicts and combine into a single JSON object
-            # with all validation errors. The final structure is:
-            #   {"validation_errors": [{"field": "...", "error": "...",
-            #   "value": "..."}, ...]}
-            # This allows consumers to parse the error message as structured data
-            # and programmatically extract field names, error types, and values.
-            validation_errors = []
-            for problem in data_problems:
-                try:
-                    # Parse the JSON string back to a dict so we can combine
-                    # all errors into a single JSON object. Each error object
-                    # maintains the same structure: field, error, value
-                    # (all via repr()).
-                    error_obj = json.loads(problem.message)
-                    validation_errors.append(error_obj)
-                except (json.JSONDecodeError, TypeError) as exc:
-                    # Defensive handling: if problem.message is not valid JSON,
-                    # create a fallback error object. This should never happen in
-                    # normal operation since problem.message is always created via
-                    # _create_validation_error_json, but protects against unexpected
-                    # data corruption or manual _DataProblem creation. The fallback
-                    # preserves the same structure (field, error, value) for
-                    # consistency.
-                    validation_errors.append(
-                        {
-                            "field": repr("unknown"),
-                            "error": repr(f"Failed to parse validation error: {exc}"),
-                            "value": repr(problem.message),
-                        }
-                    )
+            validation_errors = [problem.data for problem in data_problems]
 
             try:
-                # Combine all validation errors into a single JSON object.
-                # The resulting string will be used as the log message for the
-                # ERROR record, allowing structured parsing by log consumers.
                 error_msg = json.dumps({"validation_errors": validation_errors})
             except (TypeError, ValueError) as exc:
                 # Defensive handling: if serialization fails, create a fallback

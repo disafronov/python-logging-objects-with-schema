@@ -242,67 +242,6 @@ def test_logger_with_empty_schema(
     assert "another" in output
 
 
-def test_logger_handles_invalid_json_in_data_problem_message(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Logger should handle DataProblem with invalid JSON in message gracefully.
-
-    This tests the defensive code path when _DataProblem.message is not valid JSON
-    (should never happen in normal operation, but protects against data corruption).
-    """
-
-    monkeypatch.chdir(tmp_path)
-    _write_schema(
-        tmp_path,
-        {
-            "ServicePayload": {
-                "UserID": {"type": "int", "source": "user_id"},
-            },
-        },
-    )
-
-    from logging_objects_with_schema.errors import _DataProblem
-    from logging_objects_with_schema.schema_applier import _apply_schema_internal
-
-    # Create a logger and patch _apply_schema_internal to return a DataProblem
-    # with invalid JSON in the message
-    logger = SchemaLogger("test")
-    original_apply = _apply_schema_internal
-
-    def mock_apply_schema(schema, extra):
-        # Call original to get normal result, but replace one problem with invalid JSON
-        structured_extra, problems = original_apply(schema, extra)
-        if problems:
-            # Replace first problem with one that has invalid JSON
-            invalid_problem = _DataProblem("not valid json {")
-            problems = [invalid_problem] + problems[1:]
-        return structured_extra, problems
-
-    stream = StringIO()
-    handler = logging.StreamHandler(stream)
-    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
-    with monkeypatch.context() as m:
-        m.setattr(
-            "logging_objects_with_schema.schema_logger._apply_schema_internal",
-            mock_apply_schema,
-        )
-        # Log with invalid type to trigger validation error
-        logger.info("msg", extra={"user_id": "not-an-int"})
-
-    output = stream.getvalue()
-    # Main message should be logged
-    assert "msg" in output
-    # Error should be logged with fallback message
-    assert "ERROR" in output
-    assert "validation_errors" in output
-    # Should contain fallback error message
-    assert "Failed to parse validation error" in output or "unknown" in output
-
-
 def test_logger_handles_json_serialization_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -334,16 +273,16 @@ def test_logger_handles_json_serialization_error(
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-    # Mock json.dumps to fail on the second call (when serializing validation errors)
+    # Mock json.dumps to fail on the first call (when serializing validation errors)
     original_dumps = json.dumps
     call_count = 0
 
     def mock_dumps(*args, **kwargs):
         nonlocal call_count
         call_count += 1
-        # First call is from _create_validation_error_json (should succeed)
-        # Second call is from _log when combining errors (should fail)
-        if call_count == 2:
+        # First call is from _log when combining errors (should fail)
+        # Second call is the fallback serialization (should succeed)
+        if call_count == 1:
             raise TypeError("Serialization failed")
         return original_dumps(*args, **kwargs)
 

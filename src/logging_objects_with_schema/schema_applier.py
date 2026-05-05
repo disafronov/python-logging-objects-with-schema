@@ -6,7 +6,6 @@ to user-provided extra fields, used by SchemaLogger.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
@@ -14,14 +13,11 @@ from .errors import _DataProblem
 from .schema_loader import _CompiledSchema, _SchemaLeaf
 
 
-def _create_validation_error_json(field: str, error: str, value: Any) -> str:
-    """Create JSON string for a single validation error.
+def _create_validation_error_dict(field: str, error: str, value: Any) -> dict[str, Any]:
+    """Create a dict for a single validation error.
 
-    All values are wrapped in repr() before JSON serialization. This ensures:
-    - Any value type can be safely serialized (even non-JSON-serializable types)
-    - The error message always contains a valid Python representation of the value
-    - Security: prevents issues with special characters or control sequences
-    - Consistency: all error messages have the same format regardless of value type
+    All values are wrapped in repr() to ensure any type is representable
+    and special characters cannot cause issues downstream.
 
     Args:
         field: Field name that caused the validation error.
@@ -29,15 +25,13 @@ def _create_validation_error_json(field: str, error: str, value: Any) -> str:
         value: Invalid value that caused the error.
 
     Returns:
-        JSON string with field, error, and value (all via repr() for safety).
+        Dict with field, error, and value (all via repr() for safety).
     """
-    return json.dumps(
-        {
-            "field": repr(field),
-            "error": repr(error),
-            "value": repr(value),
-        }
-    )
+    return {
+        "field": repr(field),
+        "error": repr(error),
+        "value": repr(value),
+    }
 
 
 def _validate_list_value(
@@ -61,7 +55,7 @@ def _validate_list_value(
     """
     if item_expected_type is None:
         error_msg = "is a list but has no item type configured"
-        return _DataProblem(_create_validation_error_json(source, error_msg, value))
+        return _DataProblem(_create_validation_error_dict(source, error_msg, value))
 
     if len(value) == 0:
         # Empty lists are always valid
@@ -82,7 +76,7 @@ def _validate_list_value(
             f"expected all elements to be of type "
             f"{item_expected_type.__name__}"
         )
-        return _DataProblem(_create_validation_error_json(source, error_msg, value))
+        return _DataProblem(_create_validation_error_dict(source, error_msg, value))
 
     return None
 
@@ -151,7 +145,7 @@ def _validate_and_apply_leaf(
             f"expected {leaf.expected_type.__name__}"
         )
         problems.append(
-            _DataProblem(_create_validation_error_json(source, error_msg, value))
+            _DataProblem(_create_validation_error_dict(source, error_msg, value))
         )
         return
 
@@ -285,7 +279,7 @@ def _apply_schema_internal(
 
         if value is None:
             problems.append(
-                _DataProblem(_create_validation_error_json(source, "is None", None))
+                _DataProblem(_create_validation_error_dict(source, "is None", None))
             )
             continue
 
@@ -301,7 +295,7 @@ def _apply_schema_internal(
         error_msg = "is not defined in schema"
         problems.append(
             _DataProblem(
-                _create_validation_error_json(key, error_msg, extra_values[key])
+                _create_validation_error_dict(key, error_msg, extra_values[key])
             )
         )
 

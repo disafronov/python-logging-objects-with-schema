@@ -387,51 +387,6 @@ def test_schema_logger_log_increments_stacklevel(
     assert "test_schema_logger.py" in output
 
 
-def test_schema_logger_log_handles_json_loads_exception(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SchemaLogger._log should handle json.loads exception gracefully."""
-    monkeypatch.chdir(tmp_path)
-    _write_schema(
-        tmp_path,
-        {
-            "ServicePayload": {
-                "RequestID": {"type": "str", "source": "request_id"},
-            },
-        },
-    )
-
-    logger = SchemaLogger("test_logger")
-    stream = StringIO()
-    handler = logging.StreamHandler(stream)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
-    # Create a mock _DataProblem with invalid JSON
-    from logging_objects_with_schema.errors import _DataProblem
-    from logging_objects_with_schema.schema_applier import _apply_schema_internal
-
-    original_apply = _apply_schema_internal
-
-    def mock_apply(*args, **kwargs):
-        result, problems = original_apply(*args, **kwargs)
-        # Add a problem with invalid JSON
-        problems.append(_DataProblem("invalid json {"))
-        return result, problems
-
-    with patch(
-        "logging_objects_with_schema.schema_logger._apply_schema_internal", mock_apply
-    ):
-        logger._log(logging.INFO, "test", (), extra={"request_id": "abc"})
-
-    output = stream.getvalue()
-    # Should handle the exception and log a fallback error
-    assert "test" in output
-    assert "validation_errors" in output
-
-
 def test_schema_logger_log_handles_json_dumps_exception(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
