@@ -6,8 +6,6 @@ directory. The schema defines which extra fields are allowed to be
 emitted and which Python types they must have.
 """
 
-from __future__ import annotations
-
 import functools
 import json
 import logging

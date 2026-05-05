@@ -1,7 +1,5 @@
 """Tests for thread safety of schema caching and logger creation."""
 
-from __future__ import annotations
-
 import logging
 import threading
 from pathlib import Path

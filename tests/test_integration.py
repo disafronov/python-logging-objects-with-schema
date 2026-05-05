@@ -5,8 +5,6 @@ including multiple logger instances, working directory changes, and error
 handling during initialization (schema problems, file system errors, etc.).
 """
 
-from __future__ import annotations
-
 import logging
 from io import StringIO
 from pathlib import Path

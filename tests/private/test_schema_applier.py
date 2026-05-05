@@ -4,8 +4,6 @@ These tests cover the apply_schema_internal function and strip_empty
 functionality directly, without going through SchemaLogger.
 """
 
-from __future__ import annotations
-
 from logging_objects_with_schema.errors import _DataProblem
 from logging_objects_with_schema.schema_applier import (
     _apply_schema_internal as apply_schema_internal,
