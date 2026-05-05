@@ -1,3 +1,5 @@
+## [0.4.2-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.1...v0.4.2-rc.1) (2026-05-05)
+
 ## [0.4.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.0...v0.4.1) (2026-04-28)
 
 ## [0.4.1-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.0...v0.4.1-rc.1) (2026-04-28)
