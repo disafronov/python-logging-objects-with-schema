@@ -102,6 +102,7 @@ source = [ "src" ]
 branch = true
 
 [tool.coverage.report]
+fail_under = 100
 exclude_lines = [
   "def __repr__",
   "if self\\.debug",
