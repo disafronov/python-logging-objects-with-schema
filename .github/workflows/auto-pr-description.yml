@@ -8,6 +8,7 @@ on:
       - reopened
     branches:
       - release
+      - main
 
 jobs:
   force-release-pr:
@@ -15,7 +16,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    if: github.event.pull_request.head.ref == 'main'
+    if: >-
+      github.event_name == 'pull_request' && (
+        (github.event.pull_request.base.ref == 'release' && github.event.pull_request.head.ref == 'main') ||
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'release')
+      )
 
     steps:
       - uses: actions/checkout@v6
@@ -27,7 +32,7 @@ jobs:
           pull_request_url: ${{ github.event.pull_request.url }}
           api_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Force overwrite PR title and body
+      - name: Update PR description and title
         uses: actions/github-script@v9
         env:
           PR_BODY: ${{ steps.gen.outputs.pull_request_description }}
@@ -36,10 +41,22 @@ jobs:
           script: |
             const now = new Date().toISOString().slice(0,16).replace('T',' ');
             const body = process.env.PR_BODY;
-            await github.rest.pulls.update({
+            const base = context.payload.pull_request.base.ref;
+            const head = context.payload.pull_request.head.ref;
+            const update = {
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
-              title: `Release PR for ${now}`,
-              body: body
-            });
+              body,
+            };
+
+            // Branch roles come from `.releaserc.cjs`:
+            // - base `release`: stable releases
+            // - base `main`: prereleases ("rc")
+            if (base === 'release') {
+              update.title = `Release! PR for ${now}`;
+            } else if (base === 'main') {
+              update.title = `PR for ${now}`;
+            }
+
+            await github.rest.pulls.update(update);
