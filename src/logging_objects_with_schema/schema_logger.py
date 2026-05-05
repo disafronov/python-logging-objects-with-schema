@@ -9,7 +9,6 @@ logger behavior.
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import os
@@ -20,11 +19,6 @@ from typing import Any
 from .errors import _SchemaProblem
 from .schema_applier import _apply_schema_internal
 from .schema_loader import _compile_schema_internal, _CompiledSchema
-
-# Python 3.11+ has improved findCaller() implementation with proper stacklevel support.
-# For Python < 3.11, we use inspect.stack() as a fallback due to known issues with
-# findCaller() and stacklevel parameter.
-_USE_FINDCALLER = sys.version_info >= (3, 11)
 
 
 def _log_schema_problems_and_exit(problems: list[_SchemaProblem]) -> None:
@@ -180,41 +174,9 @@ class SchemaLogger(logging.Logger):
         # after the main log record has been emitted. This ensures the main message
         # is always logged first, and validation errors are clearly separated.
         if data_problems:
-            # Get caller information for the error log record so that validation
-            # errors point to the same location in user code as the original log call.
-            # Python 3.11+ has improved findCaller() with proper stacklevel support,
-            # so we use it as the primary method for better performance.
-            # For Python < 3.11, we fall back to inspect.stack() due to known issues
-            # with findCaller() and stacklevel parameter.
-            if _USE_FINDCALLER:
-                # Use findCaller() for Python 3.11+ (more efficient)
-                fn, lno, func, sinfo = self.findCaller(
-                    stack_info=False, stacklevel=stacklevel + 1
-                )
-            else:
-                # Fallback to inspect.stack() for Python < 3.11
-                # The stack looks like:
-                # - Frame 0: this function (_log)
-                # - Frame 1: logger.info() wrapper
-                # - Frame 2: actual caller (test_function)
-                # We need to skip frame 0 (this function) and frame 1
-                # (logger.info wrapper), so we use stacklevel + 1 to get to
-                # the actual caller.
-                stack = inspect.stack()
-                frame_idx = (
-                    stacklevel + 1
-                )  # Skip this function (0) + logger.info wrapper (1)
-                if frame_idx < len(stack):
-                    frame = stack[frame_idx]
-                    fn = frame.filename
-                    lno = frame.lineno
-                    func = frame.function
-                    sinfo = None
-                else:
-                    # Fallback to findCaller if stack is shorter than expected
-                    fn, lno, func, sinfo = self.findCaller(
-                        stack_info=False, stacklevel=stacklevel + 1
-                    )
+            fn, lno, func, sinfo = self.findCaller(
+                stack_info=False, stacklevel=stacklevel + 1
+            )
             validation_errors = [problem.data for problem in data_problems]
 
             try:
