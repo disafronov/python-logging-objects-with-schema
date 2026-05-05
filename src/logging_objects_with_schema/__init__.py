@@ -5,8 +5,6 @@ logging package that validates and filters user-provided extra fields
 according to an application-defined JSON schema.
 """
 
-from __future__ import annotations
-
 from .schema_logger import SchemaLogger
 
 __all__ = [

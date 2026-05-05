@@ -1,7 +1,5 @@
 """Tests for SchemaLogger behaviour mimicking logging.Logger."""
 
-from __future__ import annotations
-
 import logging
 from io import StringIO
 from pathlib import Path

@@ -4,8 +4,6 @@ These tests are intentionally minimal and are meant to illustrate the
 expected contract rather than exhaustively cover edge cases.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 

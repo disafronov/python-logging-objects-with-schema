@@ -7,8 +7,6 @@ the log record has been emitted, ensuring 100% compatibility with standard
 logger behavior.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os

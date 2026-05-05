@@ -1,7 +1,5 @@
 """Shared fixtures for tests."""
 
-from __future__ import annotations
-
 import pytest
 
 from logging_objects_with_schema import schema_loader
