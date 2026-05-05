@@ -7,7 +7,6 @@ to user-provided extra fields, used by SchemaLogger.
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
@@ -274,57 +273,25 @@ def _apply_schema_internal(
     extra: dict[str, Any] = {}
     problems: list[_DataProblem] = []
 
-    # Group leaves by source field name. This is necessary because a single source
-    # can be referenced by multiple leaves (allowing the same value to appear in
-    # different locations in the output structure). Grouping allows us to process
-    # all leaves for a given source together, which is more efficient and allows
-    # us to validate the value once per source (e.g., checking for None) rather
-    # than once per leaf.
-    source_to_leaves: dict[str, list[_SchemaLeaf]] = defaultdict(list)
-    for leaf in compiled.leaves:
-        source_to_leaves[leaf.source].append(leaf)
-
-    used_sources = set(source_to_leaves.keys())
-
-    # Process each source that appears in the schema. If a source is missing from
-    # extra_values, we silently skip it (this is normal - not all sources need to
-    # be present in every log call). We only validate and apply sources that are
-    # actually provided.
-    for source, leaves in source_to_leaves.items():
+    for source, leaves in compiled.source_to_leaves.items():
         if source not in extra_values:
-            # Source not provided - this is normal, not an error. Skip it.
             continue
 
         value = extra_values[source]
 
-        # Check for None values explicitly. None is never allowed for any type,
-        # so we check it once per source (not once per leaf) before attempting
-        # type-specific validation. This avoids redundant checks when a source
-        # is used by multiple leaves.
         if value is None:
-            error_msg = "is None"
             problems.append(
-                _DataProblem(_create_validation_error_json(source, error_msg, None))
+                _DataProblem(_create_validation_error_json(source, "is None", None))
             )
             continue
 
-        # Validate the value against each leaf that references this source.
-        # Each leaf validates independently, so a value might pass validation
-        # for some leaves (where type matches) but fail for others (where type
-        # doesn't match). The value is written only to locations where validation
-        # succeeds.
         for leaf in leaves:
             _validate_and_apply_leaf(leaf, value, source, extra, problems)
 
-    # Report redundant fields: any keys in extra_values that are not referenced
-    # by any schema leaf. These are fields that the user provided but which are
-    # not defined in the schema, so they cannot be included in the log output.
-    # Optimization: if schema is empty (no used_sources), all fields are redundant,
-    # so we can skip the membership check for each key.
     redundant_keys = (
         extra_values.keys()
-        if not used_sources
-        else (key for key in extra_values.keys() if key not in used_sources)
+        if not compiled.known_sources
+        else (key for key in extra_values.keys() if key not in compiled.known_sources)
     )
     for key in redundant_keys:
         error_msg = "is not defined in schema"
