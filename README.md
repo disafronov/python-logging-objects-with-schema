@@ -145,7 +145,9 @@ directory until it finds the file or reaches the filesystem root.
 **Important**: If there are any problems with the schema (missing file, broken
 JSON, invalid structure, etc.), the application is terminated after logging
 schema problems to stderr. Schema validation happens when the first logger
-instance is created.
+instance is created. Termination uses `os._exit(1)` — bypassing `atexit`
+handlers and `finally` blocks — to prevent any cleanup code from running
+against a broken logger that was never fully registered.
 
 **Note**: The schema is compiled once per process and cached. Schema changes
 require an application restart to take effect. The library is thread-safe.
