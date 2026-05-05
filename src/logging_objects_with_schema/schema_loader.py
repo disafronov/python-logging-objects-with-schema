@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 from collections.abc import Iterable, Mapping, MutableMapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -58,6 +58,19 @@ class _CompiledSchema:
     """
 
     leaves: list[_SchemaLeaf]
+    source_to_leaves: dict[str, list[_SchemaLeaf]] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
+    known_sources: frozenset[str] = field(
+        default_factory=frozenset, init=False, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        source_map: dict[str, list[_SchemaLeaf]] = {}
+        for leaf in self.leaves:
+            source_map.setdefault(leaf.source, []).append(leaf)
+        self.source_to_leaves = source_map
+        self.known_sources = frozenset(source_map)
 
     @property
     def is_empty(self) -> bool:
