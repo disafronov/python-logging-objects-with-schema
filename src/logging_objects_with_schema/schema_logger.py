@@ -31,13 +31,10 @@ def _log_schema_problems_and_exit(problems: list[_SchemaProblem]) -> None:
     Args:
         problems: List of schema problems to log.
     """
-    # Format error message with details of all problems
-    # (same format as data problems)
     problem_messages = [problem.message for problem in problems]
     error_msg = f"Schema has problems: {'; '.join(problem_messages)}\n"
     sys.stderr.write(error_msg)
     sys.stderr.flush()
-    # Use os._exit() for immediate termination without cleanup handlers
     os._exit(1)
 
 
@@ -86,35 +83,20 @@ class SchemaLogger(logging.Logger):
                 Note: None and empty set() are semantically equivalent - both
                 mean "no additional forbidden keys" and produce the same result.
         """
-        # Validate schema before creating the logger instance to avoid
-        # registering a broken logger in the logging manager cache.
-        # Schema is compiled and cached first, then problems are checked.
+        # Compile before super().__init__() to avoid registering a broken logger
+        # in logging's manager cache.
         try:
             compiled, problems = _compile_schema_internal(forbidden_keys)
         except (OSError, ValueError, RuntimeError) as exc:
-            # Convert system-level exceptions to _SchemaProblem so they can be
-            # handled the same way as schema validation problems.
-            # - OSError: system-level file system issues (e.g., os.getcwd() failures
-            #   when the current working directory is inaccessible or deleted).
-            #   Note: OSError that occurs when reading the schema file (e.g., permission
-            #   denied, I/O errors) is converted to _SchemaProblem in _load_raw_schema()
-            #   and does not reach this exception handler.
-            # - ValueError: path resolution issues (e.g., invalid path characters,
-            #   malformed paths during schema file discovery)
-            # - RuntimeError: threading issues (e.g., lock acquisition problems)
-            # Note: JSON parsing and schema structure validation errors are
-            # converted to _SchemaProblem instances and do not raise ValueError here.
-            # Note: System exceptions (KeyboardInterrupt, SystemExit) are not
-            # caught, which is the correct behavior.
+            # OSError: os.getcwd() failed (inaccessible CWD). File-level OSError is
+            # already converted to _SchemaProblem inside _load_raw_schema and won't
+            # reach here. ValueError: path resolution. RuntimeError: lock failure.
             problems = [_SchemaProblem(f"Schema compilation failed: {exc}")]
             compiled = _CompiledSchema(leaves=[])
 
         if problems:
-            # Schema is invalid; log problems and terminate without creating
-            # the logger instance.
             _log_schema_problems_and_exit(problems)
 
-        # Schema is valid; create the logger instance.
         super().__init__(name, level)
         self._schema: _CompiledSchema = compiled
 
@@ -150,12 +132,7 @@ class SchemaLogger(logging.Logger):
             extra or {},
         )
 
-        # Emit the main log record first, even if there are validation problems.
-        # This ensures 100% compatibility with standard logger behavior: the user's
-        # log message is always emitted, and validation errors are reported separately
-        # as additional ERROR messages. This approach guarantees that the application
-        # continues to work normally even when validation problems occur (no exceptions
-        # are raised, no log records are lost).
+        # Emit user's message first — validation errors follow as separate ERRORs.
         super()._log(
             level,
             msg,
@@ -163,15 +140,11 @@ class SchemaLogger(logging.Logger):
             exc_info=exc_info,
             extra=structured_extra,
             stack_info=stack_info,
-            # Increment stacklevel to account for this override frame so that
-            # caller information points to user code instead of SchemaLogger._log.
-            stacklevel=stacklevel + 1,
+            stacklevel=stacklevel + 1,  # +1 skips this override frame
         )
 
-        # If there were validation problems, log them as separate ERROR messages
-        # after the main log record has been emitted. This ensures the main message
-        # is always logged first, and validation errors are clearly separated.
         if data_problems:
+            # stack_info=False: stack trace already attached to the main record above.
             fn, lno, func, sinfo = self.findCaller(
                 stack_info=False, stacklevel=stacklevel + 1
             )
@@ -180,12 +153,8 @@ class SchemaLogger(logging.Logger):
             try:
                 error_msg = json.dumps({"validation_errors": validation_errors})
             except (TypeError, ValueError) as exc:
-                # Defensive handling: if serialization fails, create a fallback
-                # error message. This should never happen in normal operation since
-                # validation_errors contains only dicts with primitive values (all
-                # values are already serialized via repr()), but protects against
-                # unexpected data corruption or edge cases in JSON serialization.
-                # The fallback ensures we always have a valid JSON error message.
+                # Should never happen: repr() in _create_validation_error_dict
+                # guarantees all values are JSON-serializable strings.
                 error_msg = json.dumps(
                     {
                         "validation_errors": [
