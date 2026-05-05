@@ -30,6 +30,12 @@ repos:
         args: [--allow-multiple-documents]
       - id: check-toml
         stages: [pre-commit]
+      - id: check-case-conflict
+        stages: [pre-commit]
+      - id: name-tests-test
+        stages: [pre-commit]
+        args: [--pytest-test-first]
+        exclude: ^.*/tests/runner\.py$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.46.0
@@ -46,13 +52,6 @@ repos:
 
   - repo: local
     hooks:
-      - id: make-format
-        name: make format (pre-commit)
-        stages: [pre-commit]
-        language: system
-        entry: make format
-        pass_filenames: false
-
       - id: make-lint
         name: make lint (pre-commit)
         stages: [pre-commit]
