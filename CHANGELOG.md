@@ -1,3 +1,9 @@
+## [0.4.2-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.2-rc.1...v0.4.2-rc.2) (2026-05-05)
+
+### Bug Fixes
+
+* enforce non-empty strings for type and source fields ([21ba61d](https://github.com/disafronov/python-logging-objects-with-schema/commit/21ba61dfc7ca32de848c85f42ad39450f4bbb3cc))
+
 ## [0.4.2-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.1...v0.4.2-rc.1) (2026-05-05)
 
 ## [0.4.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v0.4.0...v0.4.1) (2026-04-28)
