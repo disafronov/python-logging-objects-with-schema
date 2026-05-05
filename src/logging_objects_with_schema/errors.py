@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -60,15 +62,12 @@ class _DataProblem:
     - Redundant fields (fields not defined in the schema)
 
     Attributes:
-        message: JSON string containing structured error information. The message
-            is always a valid JSON object with the following structure:
-            ``{"field": "...", "error": "...", "value": "..."}``
-            All values are serialized via ``repr()`` for safety and consistency.
-            Examples:
-            - ``{"field": "'user_id'", "error": "'has type str, expected int'", "value": "'abc-123'"}``
-            - ``{"field": "'request_id'", "error": "'is None'", "value": "None"}``
-            - ``{"field": "'tags'", "error": "'is a list but contains elements with types dict; expected all elements to be of type str'", "value": "[{'key': 'color'}]"}``  # noqa: E501
-            - ``{"field": "'unknown_field'", "error": "'is not defined in schema'", "value": "'some_value'"}``
+        data: Dict containing structured error information with keys
+            ``field``, ``error``, and ``value`` (all via ``repr()``).
     """
 
-    message: str
+    data: dict[str, Any]
+
+    @property
+    def message(self) -> str:
+        return json.dumps(self.data)
