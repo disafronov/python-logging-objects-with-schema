@@ -56,13 +56,9 @@ def _validate_list_value(
         return _DataProblem(_create_validation_error_dict(source, error_msg, value))
 
     if len(value) == 0:
-        # Empty lists are always valid
         return None
 
-    # Collect unique type names of items that don't match the expected type.
-    # We use a set comprehension to get unique type names (not the types themselves)
-    # for the error message. This gives a clear, readable error message showing
-    # which types were found (e.g., "int, str") vs what was expected.
+    # __name__ gives "int, str" in error messages instead of "<class 'int'>".
     invalid_item_types = {
         type(item).__name__ for item in value if type(item) is not item_expected_type
     }
@@ -95,22 +91,14 @@ def _set_nested_value(
         value: The value to set at the target location.
     """
     current = target
-    # Navigate through intermediate dictionaries, creating them as needed.
-    # We iterate through all keys except the last one (path[:-1]) to build
-    # the nested structure.
     for key in path[:-1]:
         child = current.get(key)
-        # If the key doesn't exist or exists but is not a dict, create a new dict.
-        # This overwrites any non-dict value that might have been there (which
-        # shouldn't happen in normal operation, but we handle it defensively).
-        # We use isinstance() instead of checking for None because we need to
-        # ensure the value is actually a dict, not just that the key exists.
+        # isinstance catches both missing keys and non-dict values at the same key.
         if not isinstance(child, dict):
             child = {}
             current[key] = child
         current = child
 
-    # Set the final value at the last key in the path
     current[path[-1]] = value
 
 
@@ -133,10 +121,7 @@ def _validate_and_apply_leaf(
         extra: The target dictionary to write the value to if validation passes.
         problems: List to append validation problems to.
     """
-    # Use strict type checking (type() is) instead of isinstance() to
-    # prevent bool values from passing validation for int types (since
-    # bool is a subclass of int). This ensures that the actual
-    # runtime type matches the schema type exactly.
+    # type() is, not isinstance(): bool subclasses int and must not pass int validation.
     if type(value) is not leaf.expected_type:
         error_msg = (
             f"has type {type(value).__name__}, "
@@ -147,10 +132,7 @@ def _validate_and_apply_leaf(
         )
         return
 
-    # For lists, validate that all elements strictly match the declared
-    # item_expected_type (homogeneous primitive list).
-    # Note: isinstance() check is needed for type narrowing (mypy), even though
-    # type(value) is list is already guaranteed by the check above.
+    # isinstance() for mypy narrowing; type(value) is list is already guaranteed above.
     if leaf.expected_type is list and isinstance(value, list):
         list_problem = _validate_list_value(value, source, leaf.item_expected_type)
         if list_problem is not None:

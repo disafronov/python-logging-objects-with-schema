@@ -53,6 +53,16 @@ class _CompiledSchema:
     This class is part of the internal implementation and is not considered
     a public API. Its signature and behaviour may change between releases
     without preserving backward compatibility.
+
+    Attributes:
+        leaves: Flat list of all schema leaves. This is the only constructor
+            argument; all other attributes are derived from it in
+            ``__post_init__``.
+        source_to_leaves: Maps each source field name to the list of leaves
+            that read from it. Populated by ``__post_init__``.
+        known_sources: Frozenset of all source field names appearing in the
+            schema. Used for O(1) redundant-field detection during validation.
+            Populated by ``__post_init__``.
     """
 
     leaves: list[_SchemaLeaf]
@@ -159,15 +169,11 @@ def _find_schema_file() -> Path | None:
     while True:
         schema_path = current / _SCHEMA_FILE_NAME
         if schema_path.exists():
-            # Use resolve() to get an absolute path and resolve any symbolic links.
-            # This ensures we have a canonical path that can be used as a cache key
-            # and for consistent error reporting.
+            # resolve() canonicalizes symlinks so the path is stable as a cache key.
             return schema_path.resolve()
 
-        # Move to parent directory
         parent = current.parent
         if parent == current:
-            # Reached filesystem root, stop searching
             break
         current = parent
 
@@ -199,18 +205,13 @@ def _check_cached_found_file_path() -> Path | None:
     if _resolved_schema_path is None:
         return None
 
-    # Check if this is actually a found file cache (not missing file cache)
-    # by checking _cached_cwd. We don't need 'global' here since we only read it.
+    # _cached_cwd being non-None means we cached a missing-file path, not a found one.
     if _cached_cwd is not None:
-        # This path was cached as missing file, not found file
         return None
 
-    # Schema file was found, absolute path doesn't depend on CWD
-    # Return it if it still exists
     if _resolved_schema_path.exists():
         return _resolved_schema_path
 
-    # Cached file no longer exists; invalidate cache so caller will re-search
     _resolved_schema_path = None
     return None
 
@@ -231,16 +232,12 @@ def _check_cached_missing_file_path() -> Path | None:
     if _resolved_schema_path is None or _cached_cwd is None:
         return None
 
-    # Cached path is based on CWD when file was not found,
-    # check if CWD changed
     current_cwd = _get_current_working_directory()
     if current_cwd != _cached_cwd:
-        # CWD changed, invalidate cache and re-search from new CWD
         _resolved_schema_path = None
         _cached_cwd = None
         return None
 
-    # CWD unchanged, return cached path
     return _resolved_schema_path
 
 
@@ -296,27 +293,22 @@ def _get_schema_path() -> Path:
         Absolute path where the schema file is located or expected to be.
     """
     with _path_cache_lock:
-        # Check cached path for missing file first (CWD-dependent)
-        # This must be checked before found file cache, because
-        # _check_cached_found_file_path would invalidate the cache if file
-        # doesn't exist, even for missing file cache.
+        # Missing-file cache checked first: _check_cached_found_file_path would
+        # invalidate it on existence check failure if we called it first.
         if _cached_cwd is not None:
             cached_path = _check_cached_missing_file_path()
             if cached_path is not None:
                 return cached_path
 
-        # Check cached path for found file (CWD-independent)
         cached_path = _check_cached_found_file_path()
         if cached_path is not None:
             return cached_path
 
-        # Search for schema file
         found_path = _find_schema_file()
         if found_path is not None:
             return _cache_and_return_found_path(found_path)
 
-        # Schema file not found, return absolute path in current working directory
-        # (this path may not exist, but allows caller to report proper error)
+        # Return expected path even if missing — callers use it in error messages.
         return _cache_and_return_missing_path()
 
 
@@ -345,18 +337,14 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
         Tuple of (schema data, schema file path).
     """
     if not schema_path.exists():
-        # Let the caller decide how to report this.
         raise FileNotFoundError(f"Schema file not found: {schema_path}")
 
     try:
         with schema_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
     except OSError as exc:
-        # Normalise I/O errors when reading the schema file (e.g., permission
-        # denied, file not found) to ValueError so that _compile_schema_internal()
-        # can report them as _SchemaProblem instances instead of leaking raw
-        # OSError to callers. Note: System-level OSError (e.g., from os.getcwd())
-        # is not caught here and propagates directly.
+        # Converted to ValueError so _compile_schema_internal treats it as a
+        # _SchemaProblem. System-level OSError (e.g. os.getcwd()) propagates uncaught.
         raise ValueError(
             f"Failed to read schema file {schema_path}: {exc}",
         ) from exc
@@ -364,8 +352,7 @@ def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
         raise ValueError(f"Failed to parse JSON schema: {exc}") from exc
 
     if not isinstance(data, dict):
-        # Normalise non-object top-level schemas into a ValueError so that the
-        # caller can report it as a _SchemaProblem while keeping type safety.
+        # ValueError lets the caller treat a non-object top level the same as bad JSON.
         raise ValueError("Top-level schema must be a JSON object")
 
     return data, schema_path
@@ -439,27 +426,19 @@ def _determine_node_type_and_validate(
     source_value = value_dict.get("source")
     item_type_value = value_dict.get("item_type")
 
-    # Check if node has leaf properties
-    # Leaf properties are: type (required, string), source (required, string),
-    # item_type (optional, string). If type/source/item_type are objects,
-    # they are children, not properties
+    # type/source/item_type as objects means children, not leaf properties.
     has_leaf_properties = (
         isinstance(type_value, str)
         or isinstance(source_value, str)
         or isinstance(item_type_value, str)
     )
 
-    # Check if node has children (any field that is an object/Mapping)
-    # Children can have ANY names, including type, source, item_type - this is
-    # valid for inner nodes. If type, source, or item_type are objects,
-    # they count as children
+    # Any field whose value is an object is a child, even if named "type" or "source".
     has_children = any(
         isinstance(field_value, Mapping) for field_value in value_dict.values()
     )
 
-    # Validate node structure
     if has_leaf_properties and has_children:
-        # Node cannot have both properties and children
         problems.append(
             _SchemaProblem(
                 f"Invalid node at {_format_path(path, key)}: "
@@ -470,7 +449,6 @@ def _determine_node_type_and_validate(
         return (None, False)
 
     if not has_leaf_properties and not has_children:
-        # Node must be either a leaf or have children
         problems.append(
             _SchemaProblem(
                 f"Invalid node at {_format_path(path, key)}: "
@@ -480,7 +458,6 @@ def _determine_node_type_and_validate(
         )
         return (None, False)
 
-    # Node is valid - determine type
     if has_leaf_properties:
         return ("leaf", True)
     else:  # has_children
@@ -507,10 +484,7 @@ def _validate_and_create_leaf(
     leaf_type = value_dict.get("type")
     leaf_source = value_dict.get("source")
 
-    # This is supposed to be a leaf - validate required fields first.
-    # Type must be a string (not None, not empty, and not other types like bool/int)
     type_invalid = _is_empty_or_none(leaf_type) or not isinstance(leaf_type, str)
-    # Source must be a string (not None, not empty, and not other types like bool/int)
     source_invalid = _is_empty_or_none(leaf_source) or not isinstance(leaf_source, str)
 
     if type_invalid:
@@ -532,12 +506,7 @@ def _validate_and_create_leaf(
     if type_invalid or source_invalid:
         return None
 
-    # Note: Check for children is done in _determine_node_type_and_validate()
-    # before this function is called, so we don't need to check here.
-
-    # Convert to string before lookup to handle cases where the JSON parser
-    # might return non-string types (though this shouldn't happen with valid JSON).
-    # This ensures type safety and consistent behavior.
+    # Children check is upstream in _determine_node_type_and_validate.
     expected_type = _TYPE_MAP.get(str(leaf_type))
     if expected_type is None:
         problems.append(
@@ -548,12 +517,8 @@ def _validate_and_create_leaf(
         return None
 
     item_expected_type: type | None = None
-    # For list-typed leaves we require an explicit, primitive item_type
-    # to ensure element homogeneity (e.g. list[str], list[int]).
     if expected_type is list:
         item_type_name = value_dict.get("item_type")
-        # Item type must be a string (not None, not empty, and not other types
-        # like bool/int)
         item_type_invalid = _is_empty_or_none(item_type_name) or not isinstance(
             item_type_name, str
         )
@@ -568,7 +533,6 @@ def _validate_and_create_leaf(
             return None
 
         item_expected_type = _TYPE_MAP.get(str(item_type_name))
-        # Item type must be a primitive (str, int, float, bool), not list
         if item_expected_type is None or item_expected_type is list:
             problems.append(
                 _SchemaProblem(
@@ -581,9 +545,6 @@ def _validate_and_create_leaf(
 
     return _SchemaLeaf(
         path=path + (key,),
-        # Convert to string to ensure type consistency. Even though source should
-        # be a string from JSON, this guards against unexpected types and ensures
-        # the _SchemaLeaf always has a string source.
         source=str(leaf_source),
         expected_type=expected_type,
         item_expected_type=item_expected_type,
@@ -622,10 +583,7 @@ def _compile_schema_tree(
     Yields:
         _SchemaLeaf objects found in the tree.
     """
-    # Check for excessive nesting depth (DoS protection: prevent deeply nested
-    # schemas that could cause stack overflow or excessive memory usage).
-    # This check happens before processing the node to avoid unnecessary work
-    # and to provide clear error messages about the problematic path.
+    # DoS guard: deeply nested schemas could overflow the call stack.
     if len(path) > MAX_SCHEMA_DEPTH:
         problems.append(
             _SchemaProblem(
@@ -644,30 +602,21 @@ def _compile_schema_tree(
             )
             continue
 
-        # Create a mutable copy of the value dict. This is necessary because
-        # we may need to modify it during processing, and the original value
-        # might be a read-only Mapping (e.g., from JSON parsing).
+        # dict() because the original Mapping may be read-only.
         value_dict = dict(value)
 
-        # Determine node type and validate structure
-        # (checks for mixed nodes, empty nodes, etc.)
         node_type, is_valid = _determine_node_type_and_validate(
             value_dict, path, key, problems
         )
 
         if not is_valid:
-            # Node has validation errors, skip processing but continue with other nodes
             continue
 
         if node_type == "leaf":
-            # Process as leaf node
             leaf = _validate_and_create_leaf(value_dict, path, key, problems)
             if leaf is not None:
                 yield leaf
         else:  # node_type == "inner"
-            # Process as inner node - recurse into children
-            # Note: node_type can only be "leaf" or "inner" when is_valid is True.
-            # If is_valid is False, we already continue above.
             for child_leaf in _compile_schema_tree(value_dict, path + (key,), problems):
                 yield child_leaf
 
@@ -704,9 +653,7 @@ def _get_builtin_logrecord_attributes() -> set[str]:
         >>> "ServicePayload" in forbidden
         False
     """
-    # Create a minimal LogRecord instance to inspect its attributes
-    # This is necessary because LogRecord attributes are not defined as
-    # class attributes but are set in __init__
+    # LogRecord attributes are set in __init__, not on the class — must instantiate.
     record = logging.LogRecord(
         name="",
         level=0,
@@ -717,10 +664,6 @@ def _get_builtin_logrecord_attributes() -> set[str]:
         exc_info=None,
     )
 
-    # Use dir() to get all attributes, then filter out:
-    # - Private attributes (starting with _)
-    # - Callable attributes (methods)
-    # This leaves only data fields that represent actual LogRecord attributes
     forbidden = set()
     for attr_name in dir(record):
         if attr_name.startswith("_"):
@@ -748,13 +691,8 @@ def _check_root_conflicts(
             Note: None and empty set() are semantically equivalent - both
             mean "no additional forbidden keys" and produce the same result.
     """
-    # Builtin keys always present, cannot be replaced
     forbidden_root_keys = _get_builtin_logrecord_attributes()
-    # Merge with additional forbidden keys if provided.
-    # We use `if forbidden_keys:` instead of `if forbidden_keys is not None:` because
-    # both None and empty set() semantically mean "no additional forbidden keys".
-    # This check treats them equivalently: None is falsy, and empty set() is also
-    # falsy, so both cases skip the merge operation, which is the correct behavior.
+    # if forbidden_keys: treats None and empty set() equally — both mean no additions.
     if forbidden_keys:
         forbidden_root_keys = forbidden_root_keys | forbidden_keys
 
@@ -824,30 +762,14 @@ def _compile_schema_internal(
         Tuple of (_CompiledSchema, list[_SchemaProblem]).
     """
     schema_path = _get_schema_path()
-    # Create cache key that includes forbidden keys.
-    # We use `frozenset(forbidden_keys or ())` instead of checking for None explicitly
-    # because both None and empty set() should produce the same cache key (frozenset()).
-    # This is semantically correct: both None and set() mean "no additional forbidden
-    # keys", so they should share the same cached compilation result. The `or ()`
-    # operator converts None to empty tuple, which frozenset() then converts to empty
-    # frozenset, and empty set() also becomes empty frozenset, ensuring cache key
-    # consistency.
+    # frozenset(forbidden_keys or ()) treats None and set() as the same cache key.
     cache_key = (schema_path, frozenset(forbidden_keys or ()))
 
-    # Fast-path: First check (with lock for thread-safety) if we have already attempted
-    # to compile schema for this path and forbidden keys set. This provides thread-safe
-    # cache access in the common case when the schema is already cached.
+    # Fast path: check cache under lock before doing expensive compilation.
     with _cache_lock:
         cached = _SCHEMA_CACHE.get(cache_key)
     if cached is not None:
         return cached
-
-    # Schema not in cache. We need to compile it. However, between the check above
-    # and now, another thread might have started (or even finished) compiling the
-    # same schema. We use double-checked locking to handle this race condition:
-    # after doing the expensive work (loading/compiling), we check the cache again
-    # while holding the lock. If another thread already compiled it, we use that
-    # result instead of storing our own (which might be different if the file changed).
 
     problems: list[_SchemaProblem] = []
 
@@ -856,9 +778,7 @@ def _compile_schema_internal(
     except (FileNotFoundError, ValueError) as exc:
         problems.append(_SchemaProblem(str(exc)))
         result = _create_empty_compiled_schema_with_problems(problems)
-        # Double-checked locking: Check cache again while holding lock. Another
-        # thread might have compiled the schema (or handled the same error) while
-        # we were processing the exception. If so, use the cached result.
+        # DCL: another thread may have stored a result while we handled the error.
         with _cache_lock:
             cached = _SCHEMA_CACHE.get(cache_key)
             if cached is not None:
@@ -866,13 +786,8 @@ def _compile_schema_internal(
             _SCHEMA_CACHE[cache_key] = result
         return result
 
-    # Check root key conflicts before compiling the tree. This allows us to
-    # catch conflicts early and report them as schema problems. We do this
-    # before tree compilation to avoid unnecessary work if there are conflicts.
     _check_root_conflicts(raw_schema, problems, forbidden_keys)
 
-    # Compile the schema tree into leaves. Each root key becomes a separate
-    # tree that we compile recursively. Problems are collected as we go.
     leaves: list[_SchemaLeaf] = []
     for key, value in raw_schema.items():
         if not isinstance(value, Mapping):
@@ -881,20 +796,14 @@ def _compile_schema_internal(
             )
             continue
 
-        # Create a mutable copy of the value dict for recursive compilation.
-        # This ensures we can safely process nested structures without modifying
-        # the original schema dictionary.
+        # dict() because the original Mapping may be read-only.
         for leaf in _compile_schema_tree(dict(value), (key,), problems):
             leaves.append(leaf)
 
     compiled = _CompiledSchema(leaves=leaves)
     result = (compiled, problems)
 
-    # Double-checked locking: Check cache again while holding lock. Another thread
-    # might have compiled the schema while we were doing the expensive compilation
-    # work (parsing JSON, validating, building leaves). If so, use the cached result
-    # instead of overwriting it with our own (which might be different if the file
-    # was modified between reads).
+    # DCL: another thread may have stored a result while we compiled.
     with _cache_lock:
         cached = _SCHEMA_CACHE.get(cache_key)
         if cached is not None:
