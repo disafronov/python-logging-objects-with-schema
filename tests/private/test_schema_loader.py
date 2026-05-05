@@ -310,7 +310,7 @@ def test_incomplete_leaf_missing_type(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_incomplete_leaf_missing_source(
@@ -332,7 +332,7 @@ def test_incomplete_leaf_missing_source(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    assert any("source cannot be None or empty" in p.message for p in problems)
+    assert any("source must be a non-empty string" in p.message for p in problems)
 
 
 def test_incomplete_leaf_empty_source(
@@ -354,7 +354,7 @@ def test_incomplete_leaf_empty_source(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    assert any("source cannot be None or empty" in p.message for p in problems)
+    assert any("source must be a non-empty string" in p.message for p in problems)
 
 
 def test_incomplete_leaf_empty_type(
@@ -376,7 +376,7 @@ def test_incomplete_leaf_empty_type(
     compiled, problems = compile_schema_internal()
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_multiple_root_keys_with_valid_leaves(
@@ -666,7 +666,7 @@ def test_validate_and_create_leaf_missing_type() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "type cannot be None or empty" in problems[0].message
+    assert "type must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_missing_source() -> None:
@@ -680,7 +680,7 @@ def test_validate_and_create_leaf_missing_source() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "source cannot be None or empty" in problems[0].message
+    assert "source must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_empty_type() -> None:
@@ -694,7 +694,7 @@ def test_validate_and_create_leaf_empty_type() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "type cannot be None or empty" in problems[0].message
+    assert "type must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_whitespace_type() -> None:
@@ -708,7 +708,7 @@ def test_validate_and_create_leaf_whitespace_type() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "type cannot be None or empty" in problems[0].message
+    assert "type must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_empty_source() -> None:
@@ -722,7 +722,7 @@ def test_validate_and_create_leaf_empty_source() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "source cannot be None or empty" in problems[0].message
+    assert "source must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_whitespace_source() -> None:
@@ -736,7 +736,7 @@ def test_validate_and_create_leaf_whitespace_source() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "source cannot be None or empty" in problems[0].message
+    assert "source must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_unknown_type() -> None:
@@ -763,7 +763,7 @@ def test_validate_and_create_leaf_list_missing_item_type() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "item_type is required for list type" in problems[0].message
+    assert "item_type must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_list_empty_item_type() -> None:
@@ -775,7 +775,7 @@ def test_validate_and_create_leaf_list_empty_item_type() -> None:
 
     assert leaf is None
     assert len(problems) == 1
-    assert "item_type is required for list type" in problems[0].message
+    assert "item_type must be a non-empty string" in problems[0].message
 
 
 def test_validate_and_create_leaf_list_invalid_item_type() -> None:
@@ -1832,7 +1832,7 @@ def test_node_with_only_item_type_as_string_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problems because type and source are required
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_type_as_number_produces_problem(
@@ -1859,7 +1859,7 @@ def test_node_with_type_as_number_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because type must be a string, not a number
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_type_as_boolean_produces_problem(
@@ -1886,7 +1886,7 @@ def test_node_with_type_as_boolean_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because type must be a string, not boolean
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_source_as_boolean_produces_problem(
@@ -1913,7 +1913,7 @@ def test_node_with_source_as_boolean_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because source must be a string, not boolean
-    assert any("source cannot be None or empty" in p.message for p in problems)
+    assert any("source must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_source_as_number_produces_problem(
@@ -1940,7 +1940,7 @@ def test_node_with_source_as_number_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because source must be a string, not number
-    assert any("source cannot be None or empty" in p.message for p in problems)
+    assert any("source must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_type_and_source_as_numbers_produces_problem(
@@ -2021,7 +2021,7 @@ def test_node_with_item_type_as_number_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because item_type must be a string, not a number
-    assert any("item_type is required for list type" in p.message for p in problems)
+    assert any("item_type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_item_type_as_boolean_produces_problem(
@@ -2052,7 +2052,7 @@ def test_node_with_item_type_as_boolean_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because item_type must be a string, not a boolean
-    assert any("item_type is required for list type" in p.message for p in problems)
+    assert any("item_type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_item_type_as_object_is_determined_as_inner(
@@ -2113,7 +2113,7 @@ def test_node_with_type_as_list_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because type must be a string, not a list
-    assert any("type cannot be None or empty" in p.message for p in problems)
+    assert any("type must be a non-empty string" in p.message for p in problems)
 
 
 def test_node_with_source_as_list_produces_problem(
@@ -2143,4 +2143,4 @@ def test_node_with_source_as_list_produces_problem(
     assert isinstance(compiled, _CompiledSchema)
     assert compiled.is_empty
     # Should have problem because source must be a string, not a list
-    assert any("source cannot be None or empty" in p.message for p in problems)
+    assert any("source must be a non-empty string" in p.message for p in problems)
