@@ -17,7 +17,8 @@ jobs:
       contents: read
       pull-requests: write
     if: >-
-      github.event_name == 'pull_request' && (
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'dependencies') && (
         (github.event.pull_request.base.ref == 'release' && github.event.pull_request.head.ref == 'main') ||
         (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'release')
       )
