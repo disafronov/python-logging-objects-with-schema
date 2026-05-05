@@ -37,11 +37,7 @@ dead-code: ## Check for dead code using vulture
 	uv run vulture
 
 # Testing
-test: ## Run tests
-	@echo "Running tests..."
-	$(PYTEST_CMD)
-
-test-coverage: ## Run tests with coverage
+test: ## Run tests with coverage
 	@echo "Running tests with coverage..."
 	$(PYTEST_CMD) $(COVERAGE_OPTS)
 
