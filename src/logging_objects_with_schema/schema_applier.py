@@ -196,8 +196,12 @@ def _strip_empty(node: Any) -> Any:
         The cleaned structure with empty dicts and None values removed.
     """
     if isinstance(node, dict):
-        cleaned = {k: _strip_empty(v) for k, v in node.items()}
-        return {k: v for k, v in cleaned.items() if v != {} and v is not None}
+        result: dict[str, Any] = {}
+        for k, v in node.items():
+            v = _strip_empty(v)
+            if v != {} and v is not None:
+                result[k] = v
+        return result
     return node
 
 
