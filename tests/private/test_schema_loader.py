@@ -1036,6 +1036,19 @@ def test_check_cached_found_file_path_returns_none_when_no_cache() -> None:
         assert result is None
 
 
+def test_check_cached_found_file_path_returns_none_when_cached_as_missing(
+    tmp_path: Path,
+) -> None:
+    """check_cached_found_file_path returns None for missing file cache."""
+
+    with schema_loader._path_cache_lock:
+        schema_loader._resolved_schema_path = tmp_path / _SCHEMA_FILE_NAME
+        schema_loader._cached_cwd = tmp_path
+
+        result = check_cached_found_file_path()
+        assert result is None
+
+
 def test_check_cached_missing_file_path_returns_path_when_cwd_unchanged(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
