@@ -491,7 +491,7 @@ def _validate_and_create_leaf(
         problems.append(
             _SchemaProblem(
                 f"Incomplete leaf at {_format_path(path, key)}: "
-                f"type cannot be None or empty",
+                f"type must be a non-empty string",
             ),
         )
 
@@ -499,7 +499,7 @@ def _validate_and_create_leaf(
         problems.append(
             _SchemaProblem(
                 f"Incomplete leaf at {_format_path(path, key)}: "
-                f"source cannot be None or empty",
+                f"source must be a non-empty string",
             ),
         )
 
@@ -526,8 +526,7 @@ def _validate_and_create_leaf(
             problems.append(
                 _SchemaProblem(
                     f"Incomplete leaf at {_format_path(path, key)}: "
-                    f"item_type is required for list type and "
-                    f"cannot be None or empty",
+                    f"item_type must be a non-empty string",
                 ),
             )
             return None
