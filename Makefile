@@ -30,7 +30,7 @@ format: ## Format code
 
 lint: ## Run linting tools
 	@echo "Running linting tools..."
-	uv run black --check . && uv run isort --check-only . && uv run flake8 . && uv run mypy . && uv run bandit -r -c pyproject.toml .
+	uv run black --check . && uv run isort --check-only . && uv run flake8 . && uv run mypy && uv run bandit -c pyproject.toml -r src/
 
 dead-code: ## Check for dead code using vulture
 	@echo "Checking for dead code..."
