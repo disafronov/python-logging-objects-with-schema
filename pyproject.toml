@@ -54,32 +54,18 @@ dev = [
 
 [tool.isort]
 profile = "black"
-line_length = 88
-multi_line_output = 3
 
 [tool.black]
 line-length = 88
 include = "\\.pyi?$"
-extend-exclude = """
-/(
-  \\.eggs
-  | \\.git
-  | \\.hg
-  | \\.mypy_cache
-  | \\.tox
-  | \\.venv
-  | build
-  | dist
-)/
-"""
 
 [tool.flake8]
 max-line-length = 88
 extend-ignore = [ "E203", "W503" ]
-exclude = [ ".venv", "__pycache__", ".git", "htmlcov" ]
+exclude = [ ".venv" ]
 
 [tool.mypy]
-exclude = "tests/"
+files = [ "src" ]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -92,9 +78,6 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-
-[tool.bandit]
-exclude_dirs = [ ".venv", "__pycache__", ".git", "htmlcov", "tests" ]
 
 [tool.coverage.run]
 source = [ "src" ]
@@ -117,8 +100,8 @@ skip_covered = false
 [tool.coverage.html]
 directory = "htmlcov"
 
+
 [tool.vulture]
 min_confidence = 80
-exclude = [ "__pycache__" ]
 ignore_names = [ "cls" ]
-paths = [ "src", "tests" ]
+paths = [ "src" ]
