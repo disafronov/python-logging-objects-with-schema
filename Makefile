@@ -6,7 +6,7 @@ PYTEST_CMD = uv run python -m pytest -v
 COVERAGE_OPTS = --cov --cov-report=term-missing --cov-report=html
 
 # Phony targets
-.PHONY: all clean dead-code format help install lint test test-coverage
+.PHONY: all clean dead-code format help install lint test
 
 # Default target
 help: ## Show this help message
