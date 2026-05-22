@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.0...v1.0.1) (2026-05-22)
+
+### Bug Fixes
+
+* respect logger filters for validation errors ([a6232a6](https://github.com/disafronov/python-logging-objects-with-schema/commit/a6232a69a227b753e8a41f9f887a4ab13f86f95b))
+
 ## [1.0.1-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.0...v1.0.1-rc.1) (2026-05-22)
 
 ### Bug Fixes
