@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "logging-objects-with-schema"
-version = "1.0.0"
+version = "1.0.1rc1"
 description = "Proxy logging wrapper that validates extra fields against a JSON schema."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -87,7 +87,6 @@ skip_covered = false
 
 [tool.coverage.html]
 directory = "htmlcov"
-
 
 [tool.vulture]
 min_confidence = 80
