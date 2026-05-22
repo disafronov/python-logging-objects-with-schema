@@ -185,7 +185,6 @@ class SchemaLogger(logging.Logger):
                 sinfo,  # sinfo - stack info from caller
             )
             try:
-                self.callHandlers(error_record)
+                self.handle(error_record)
             except Exception:
-                # If handler failed, log error to stderr (standard logging behavior)
                 sys.stderr.write(f"Error in logging handler: {error_record}\n")

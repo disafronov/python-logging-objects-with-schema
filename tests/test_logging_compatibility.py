@@ -126,3 +126,35 @@ def test_schema_logger_accepts_extra_fields_without_error(
 
     output = stream.getvalue()
     assert "msg" in output
+
+
+def test_schema_logger_validation_errors_respect_logger_filters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Validation error records should pass through logger filters."""
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            "ServicePayload": {
+                "RequestID": {"type": "str", "source": "request_id"},
+            },
+        },
+    )
+
+    stream = StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(message)s"))
+
+    logger = SchemaLogger("test-filtered-validation-errors")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.addFilter(lambda record: not record.getMessage().startswith("{"))
+
+    logger.info("msg", extra={"request_id": 42})
+
+    output = stream.getvalue()
+    assert "INFO:msg" in output
+    assert "validation_errors" not in output

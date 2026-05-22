@@ -434,11 +434,11 @@ def test_schema_logger_log_handles_json_dumps_exception(
     assert "validation_errors" in output
 
 
-def test_schema_logger_log_handles_callhandlers_exception(
+def test_schema_logger_log_handles_validation_error_handler_exception(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SchemaLogger._log should handle callHandlers exception gracefully."""
+    """SchemaLogger._log should handle validation error handler exceptions."""
     monkeypatch.chdir(tmp_path)
     _write_schema(
         tmp_path,
