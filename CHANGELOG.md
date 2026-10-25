@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.2...v1.0.3) (2026-10-25)
+
+### Bug Fixes
+
+* guard validation diagnostics against broken repr ([6bc6035](https://github.com/disafronov/python-logging-objects-with-schema/commit/6bc603509bf1692edc62ca0780824c14279e51c4))
+
 ## [1.0.3-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.2...v1.0.3-rc.1) (2026-10-25)
 
 ### Bug Fixes
