@@ -1,3 +1,9 @@
+## [1.0.2-rc.3](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.2-rc.2...v1.0.2-rc.3) (2026-10-25)
+
+### Bug Fixes
+
+* cover uv dependencies with Dependabot ([16afc2e](https://github.com/disafronov/python-logging-objects-with-schema/commit/16afc2e4bb164100ac0e7021f3e2ba3693bbf5fd))
+
 ## [1.0.2-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.2-rc.1...v1.0.2-rc.2) (2026-10-23)
 
 ## [1.0.2-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.1...v1.0.2-rc.1) (2026-07-01)
