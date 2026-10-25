@@ -1,9 +1,10 @@
 """Schema loading and validation for logging_objects_with_schema.
 
 The schema is expected to live in a JSON file named
-``logging_objects_with_schema.json`` in the application root
-directory. The schema defines which extra fields are allowed to be
-emitted and which Python types they must have.
+``logging_objects_with_schema.json`` in the current working directory or one
+of its parent directories, up to the filesystem root; the first file found is
+used. The schema defines which extra fields are allowed to be emitted and which
+Python types they must have.
 """
 
 import functools
@@ -313,7 +314,7 @@ def _get_schema_path() -> Path:
 
 
 def _load_raw_schema(schema_path: Path) -> tuple[dict[str, Any], Path]:
-    """Load raw JSON schema from the application root.
+    """Load raw JSON schema from the resolved schema file.
 
     This function attempts to read and parse the schema file. If any problems
     occur (file not found, I/O errors, invalid JSON, wrong top-level type),
