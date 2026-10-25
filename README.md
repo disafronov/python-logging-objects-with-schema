@@ -1,11 +1,11 @@
 # python-logging-objects-with-schema
 
-This library provides a logger subclass built on top of the standard `logging`
-module that strictly controls additional `extra` fields using a JSON schema.
-`SchemaLogger` is a drop-in replacement for `logging.Logger` that validates
-`extra` fields against a JSON schema file (`logging_objects_with_schema.json`)
-located by searching upward from the current working directory to the filesystem
-root.
+`SchemaLogger` extends Python's standard `logging.Logger` with schema-driven
+validation and projection of `extra` fields. It preserves the standard logging
+API while invalid structured data is dropped and reported separately.
+
+The schema is defined in `logging_objects_with_schema.json`, located by
+searching upward from the current working directory to the filesystem root.
 
 ## Schema as a contract
 
@@ -33,8 +33,9 @@ systems) can rely on a consistent log structure.
   where `int` is declared, and `int` is **not** accepted where `float` is
   declared. There are no implicit type conversions.
 - All validation problems are aggregated and logged as a single ERROR message
-  **after** the log record has been emitted, ensuring 100% compatibility with
-  standard logger behavior (no exceptions are raised).
+  **after** the log record has been emitted. Data-validation failures do not
+  raise from the logging call; valid fields are emitted and violations are
+  reported separately.
 - Application code must only send `extra` fields that are described in the
   schema and match the declared Python types. Any deviation from the schema
   is considered a contract violation.
@@ -128,7 +129,7 @@ logger.info(
 ```python
 from logging_objects_with_schema import SchemaLogger
 
-# SchemaLogger is a drop-in replacement - no exception handling needed.
+# SchemaLogger uses the standard logging API; data-validation failures do not raise.
 # If the schema has problems, the application will be terminated after
 # logging schema problems to stderr.
 logging.setLoggerClass(SchemaLogger)
@@ -348,7 +349,7 @@ All keys are merged together - they are not replaced, only supplemented.
 - Each subclass must implement the logic to pass `forbidden_keys` to its parent
   if it wants to propagate keys from its own subclasses
 - The `forbidden_keys` parameter is optional - if not provided, only builtin
-  keys are used, maintaining 100% backward compatibility
+  keys are used, preserving the default forbidden-key behavior
 - `None` and empty `set()` are semantically equivalent for `forbidden_keys` -
   both mean "no additional forbidden keys" and produce the same result
 
