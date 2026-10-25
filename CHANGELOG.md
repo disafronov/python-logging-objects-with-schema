@@ -1,3 +1,9 @@
+## [1.0.4-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.3...v1.0.4-rc.1) (2026-10-25)
+
+### Bug Fixes
+
+* **release:** sign generated releases as GitHub Actions ([93c4f1d](https://github.com/disafronov/python-logging-objects-with-schema/commit/93c4f1d44544689146d6760272d041bbed97e21c))
+
 ## [1.0.3](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.2...v1.0.3) (2026-10-25)
 
 ### Bug Fixes
