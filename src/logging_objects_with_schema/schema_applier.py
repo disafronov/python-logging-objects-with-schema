@@ -11,11 +11,20 @@ from .errors import _DataProblem
 from .schema_loader import _CompiledSchema, _SchemaLeaf
 
 
+def _safe_repr(value: Any) -> str:
+    """Represent diagnostic data without propagating user __repr__ failures."""
+    try:
+        return repr(value)
+    except Exception:
+        # Do not format the value or exception again: either may have a broken repr.
+        return "<unrepresentable value>"
+
+
 def _create_validation_error_dict(field: str, error: str, value: Any) -> dict[str, Any]:
     """Create a dict for a single validation error.
 
-    All values are wrapped in repr() to ensure any type is representable
-    and special characters cannot cause issues downstream.
+    All values use safe repr() formatting. If user code raises during repr(),
+    a constant placeholder preserves the validation diagnostic.
 
     Args:
         field: Field name that caused the validation error.
@@ -23,12 +32,12 @@ def _create_validation_error_dict(field: str, error: str, value: Any) -> dict[st
         value: Invalid value that caused the error.
 
     Returns:
-        Dict with field, error, and value (all via repr() for safety).
+        Dict with field, error, and value as safely represented strings.
     """
     return {
-        "field": repr(field),
-        "error": repr(error),
-        "value": repr(value),
+        "field": _safe_repr(field),
+        "error": _safe_repr(error),
+        "value": _safe_repr(value),
     }
 
 

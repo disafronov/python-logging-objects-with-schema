@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from io import StringIO
 from pathlib import Path
@@ -594,3 +595,64 @@ def test_schema_logger_log_validation_errors_logged_after_main_message(
     if len(messages) > 1:
         assert messages[1][0] == logging.ERROR
         assert "validation_errors" in messages[1][1]
+
+
+@pytest.mark.parametrize("failure", ["raises", "non_string"])
+@pytest.mark.parametrize("case", ["wrong_type", "unknown", "empty_schema", "list"])
+def test_invalid_extra_with_broken_repr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    case: str,
+) -> None:
+    """Broken user repr must not prevent emission or aggregated diagnostics."""
+
+    class BrokenRepr:
+        def __repr__(self):
+            if failure == "raises":
+                raise RuntimeError("repr failed")
+            return 42
+
+    monkeypatch.chdir(tmp_path)
+    schema = {
+        "ServicePayload": {
+            "RequestID": {"type": "str", "source": "request_id"},
+            "UserID": {"type": "int", "source": "user_id"},
+            "Tags": {"type": "list", "source": "tags", "item_type": "str"},
+        }
+    }
+    _write_schema(tmp_path, {} if case == "empty_schema" else schema)
+    value = BrokenRepr()
+    field = {
+        "wrong_type": "user_id",
+        "unknown": "unknown",
+        "empty_schema": "unknown",
+        "list": "tags",
+    }[case]
+    extra = {field: [value] if case == "list" else value}
+    if case != "empty_schema":
+        extra.update(
+            request_id="abc-123", user_id=None if case != "wrong_type" else value
+        )
+
+    logger = SchemaLogger("broken_repr", logging.INFO)
+    records = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    logger.addHandler(CaptureHandler())
+    logger.info("main message", extra=extra)
+
+    assert [record.levelno for record in records] == [logging.INFO, logging.ERROR]
+    assert records[0].getMessage() == "main message"
+    if case == "empty_schema":
+        assert not hasattr(records[0], "ServicePayload")
+    else:
+        assert records[0].ServicePayload == {"RequestID": "abc-123"}
+    errors = json.loads(records[1].getMessage())["validation_errors"]
+    problem = next(error for error in errors if error["field"] == repr(field))
+    assert problem["value"] == "<unrepresentable value>"
+    assert all(isinstance(value, str) for error in errors for value in error.values())
+    assert len(errors) == (2 if case in {"unknown", "list"} else 1)
