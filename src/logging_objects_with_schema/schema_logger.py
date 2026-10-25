@@ -3,8 +3,8 @@
 This class extends the standard ``logging.Logger`` to validate and filter
 user-provided ``extra`` fields according to a compiled JSON schema. When
 validation problems are detected, they are logged as ERROR messages *after*
-the log record has been emitted, ensuring 100% compatibility with standard
-logger behavior.
+the main log record has been emitted. The standard logging call API is
+preserved, but ``extra`` handling intentionally differs from ``logging.Logger``.
 """
 
 import json
@@ -45,7 +45,8 @@ class SchemaLogger(logging.Logger):
 
     This class extends :class:`logging.Logger` to add validation for
     ``extra`` fields according to a compiled JSON schema. It is designed
-    to be used as a drop-in replacement via :func:`logging.setLoggerClass`.
+    to be installed via :func:`logging.setLoggerClass`. Logging calls retain
+the standard API, while ``extra`` is schema-validated and projected.
 
     The schema is loaded from ``logging_objects_with_schema.json`` found by
     searching upward from the current working directory to the filesystem root
@@ -118,8 +119,8 @@ class SchemaLogger(logging.Logger):
         This method validates and filters the ``extra`` parameter according
         to the compiled schema before delegating to the parent class. If
         validation problems are detected, they are logged as ERROR messages
-        after the main log record has been emitted, ensuring compatibility
-        with standard logger behavior (no exceptions are raised).
+        after the main log record has been emitted. Invalid runtime ``extra``
+        values are reported separately instead of raising validation errors.
 
         Args:
             level: Logging level.
