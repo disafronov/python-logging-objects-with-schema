@@ -46,7 +46,7 @@ class SchemaLogger(logging.Logger):
     This class extends :class:`logging.Logger` to add validation for
     ``extra`` fields according to a compiled JSON schema. It is designed
     to be installed via :func:`logging.setLoggerClass`. Logging calls retain
-the standard API, while ``extra`` is schema-validated and projected.
+    the standard API, while ``extra`` is schema-validated and projected.
 
     The schema is loaded from ``logging_objects_with_schema.json`` found by
     searching upward from the current working directory to the filesystem root
