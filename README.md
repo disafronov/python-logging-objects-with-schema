@@ -1,5 +1,12 @@
 # python-logging-objects-with-schema
 
+Arbitrary `extra` fields let log producers use different names, structures, and
+types for the same information, making downstream searches, alerts, and
+dashboards harder to maintain. A shared schema makes these structured fields a
+contract between producers and consumers. `SchemaLogger` emits the valid fields
+and reports data-validation violations separately, so a malformed field does
+not discard the valid part of the record.
+
 `SchemaLogger` extends Python's standard `logging.Logger` with schema-driven
 validation and projection of `extra` fields. It preserves the standard logging
 API while invalid structured data is dropped and reported separately.
