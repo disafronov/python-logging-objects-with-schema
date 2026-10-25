@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "logging-objects-with-schema"
 version = "1.0.2rc5"
-description = "Proxy logging wrapper that validates extra fields against a JSON schema."
+description = "Schema-aware Python logging with strict extra validation and schema-driven field projection."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [ ]
