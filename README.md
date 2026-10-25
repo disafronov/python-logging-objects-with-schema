@@ -4,7 +4,8 @@ This library provides a logger subclass built on top of the standard `logging`
 module that strictly controls additional `extra` fields using a JSON schema.
 `SchemaLogger` is a drop-in replacement for `logging.Logger` that validates
 `extra` fields against a JSON schema file (`logging_objects_with_schema.json`)
-in your application root directory.
+located by searching upward from the current working directory to the filesystem
+root.
 
 ## Schema as a contract
 
@@ -48,7 +49,8 @@ pip install logging-objects-with-schema
 
 ### Quickstart (complete working example)
 
-First, create a schema file `logging_objects_with_schema.json` in your application root:
+First, create a schema file `logging_objects_with_schema.json` in the current
+working directory (or any parent directory up to the filesystem root):
 
 ```json
 {
@@ -141,9 +143,12 @@ logger.info("processing", extra={"user_id": "not-an-int"})  # Wrong type
 
 ## Schema location and format
 
-The schema file `logging_objects_with_schema.json` must be located in your
-application root directory. The library searches upward from the current working
-directory until it finds the file or reaches the filesystem root.
+The schema file `logging_objects_with_schema.json` is located by searching from
+the current working directory upward to the filesystem root. The first file
+found wins; the location of the script or package does not matter. A file in a
+parent directory is used without warning, so run the application with a fixed
+working directory (for example, `WORKDIR` in a container or `WorkingDirectory`
+in systemd).
 
 **Important**: If there are any problems with the schema (missing file, broken
 JSON, invalid structure, etc.), the application is terminated after logging

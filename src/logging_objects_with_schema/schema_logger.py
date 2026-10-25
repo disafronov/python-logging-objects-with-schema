@@ -47,10 +47,11 @@ class SchemaLogger(logging.Logger):
     ``extra`` fields according to a compiled JSON schema. It is designed
     to be used as a drop-in replacement via :func:`logging.setLoggerClass`.
 
-    The schema is loaded from ``logging_objects_with_schema.json`` in the
-    application root directory during initialization. If the schema cannot
-    be loaded or validated, the logger instance is not created, schema
-    problems are logged to stderr, and the application is terminated.
+    The schema is loaded from ``logging_objects_with_schema.json`` found by
+    searching upward from the current working directory to the filesystem root
+    during initialization. If the schema cannot be loaded or validated, the
+    logger instance is not created, schema problems are logged to stderr, and
+    the application is terminated.
 
     Example:
         >>> import logging
