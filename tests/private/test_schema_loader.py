@@ -36,16 +36,12 @@ from logging_objects_with_schema.schema_loader import (
 from logging_objects_with_schema.schema_loader import (
     _compile_schema_tree as compile_schema_tree,
 )
-from logging_objects_with_schema.schema_loader import (
-    _CompiledSchema,
-)
+from logging_objects_with_schema.schema_loader import _CompiledSchema
 from logging_objects_with_schema.schema_loader import (
     _create_empty_compiled_schema_with_problems as create_empty_schema,
 )
 from logging_objects_with_schema.schema_loader import _format_path as format_path
-from logging_objects_with_schema.schema_loader import (
-    _get_builtin_logrecord_attributes,
-)
+from logging_objects_with_schema.schema_loader import _get_builtin_logrecord_attributes
 from logging_objects_with_schema.schema_loader import (
     _get_current_working_directory as get_current_working_directory,
 )
@@ -58,9 +54,7 @@ from logging_objects_with_schema.schema_loader import (
 from logging_objects_with_schema.schema_loader import (
     _load_raw_schema as load_raw_schema,
 )
-from logging_objects_with_schema.schema_loader import (
-    _SchemaLeaf,
-)
+from logging_objects_with_schema.schema_loader import _SchemaLeaf
 from logging_objects_with_schema.schema_loader import (
     _validate_and_create_leaf as validate_and_create_leaf,
 )
