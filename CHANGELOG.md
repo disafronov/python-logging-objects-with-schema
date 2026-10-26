@@ -1,3 +1,9 @@
+## [1.0.4-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4-rc.1...v1.0.4-rc.2) (2026-10-26)
+
+### Bug Fixes
+
+* align semantic-release policy and committer sign-off ([a936c4c](https://github.com/disafronov/python-logging-objects-with-schema/commit/a936c4c2f09ec9b313789e95d3ff7a94794cdc34))
+
 ## [1.0.4-rc.1](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.3...v1.0.4-rc.1) (2026-10-25)
 
 ### Bug Fixes
