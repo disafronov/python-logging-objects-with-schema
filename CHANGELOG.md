@@ -1,3 +1,11 @@
+## [1.0.4](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.3...v1.0.4) (2026-10-30)
+
+### Bug Fixes
+
+* align semantic-release policy and committer sign-off ([52e6ce0](https://github.com/disafronov/python-logging-objects-with-schema/commit/52e6ce06e1614a840dff8d1f6d4e30614050daf1))
+* reject message and asctime as schema root keys ([4bd4c00](https://github.com/disafronov/python-logging-objects-with-schema/commit/4bd4c003d2b7105a93aeb512a9592e379523eec2))
+* **release:** sign generated releases as GitHub Actions ([3684c95](https://github.com/disafronov/python-logging-objects-with-schema/commit/3684c95083f2d9619917008e66644ef34ece6155))
+
 ## [1.0.4-rc.3](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4-rc.2...v1.0.4-rc.3) (2026-10-30)
 
 ### Bug Fixes
