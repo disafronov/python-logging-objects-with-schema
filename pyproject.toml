@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "logging-objects-with-schema"
-version = "1.0.4rc2"
+version = "1.0.4rc3"
 description = "Schema-aware Python logging with strict extra validation and schema-driven field projection."
 readme = "README.md"
 requires-python = ">=3.11"

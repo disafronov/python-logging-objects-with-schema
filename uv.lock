@@ -2313,7 +2313,7 @@ version = "0.16.0"
 
 [[package]]
 name = "logging-objects-with-schema"
-version = "1.0.4rc2"
+version = "1.0.4rc3"
 
   [package.source]
   editable = "."

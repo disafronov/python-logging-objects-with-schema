@@ -1,3 +1,9 @@
+## [1.0.4-rc.3](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4-rc.2...v1.0.4-rc.3) (2026-10-30)
+
+### Bug Fixes
+
+* reject message and asctime as schema root keys ([a39530d](https://github.com/disafronov/python-logging-objects-with-schema/commit/a39530dee2ea80fef2e09bbc65628b7f3d58eea7))
+
 ## [1.0.4-rc.2](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4-rc.1...v1.0.4-rc.2) (2026-10-26)
 
 ### Bug Fixes
