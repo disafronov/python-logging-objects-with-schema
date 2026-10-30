@@ -167,6 +167,40 @@ def test_root_key_not_conflicting_passes_validation(
     assert not root_conflict_problems
 
 
+@pytest.mark.parametrize("root_key", ["message", "asctime"])
+def test_root_key_conflicting_with_formatter_field_produces_problem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_key: str,
+) -> None:
+    """Root keys populated by formatters must be rejected.
+
+    Logger.makeRecord() raises KeyError for these names even though they are
+    absent from a fresh LogRecord instance, so they must be treated as
+    reserved during schema validation.
+    """
+
+    monkeypatch.chdir(tmp_path)
+    _write_schema(
+        tmp_path,
+        {
+            root_key: {
+                "Value": {"type": "str", "source": "value"},
+            },
+        },
+    )
+
+    # Root conflicts are reported as schema problems; the compiled tree is
+    # still returned, but SchemaLogger treats any problem as fatal.
+    compiled, problems = compile_schema_internal()
+    assert isinstance(compiled, _CompiledSchema)
+    assert any(
+        f"Root key '{root_key}' conflicts with reserved logging fields"
+        in problem.message
+        for problem in problems
+    )
+
+
 def test_empty_schema_produces_empty_compiled_schema(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1365,6 +1399,10 @@ def test__get_builtin_logrecord_attributes_includes_common_fields() -> None:
     assert "pathname" in attributes
     assert "lineno" in attributes
     assert "msg" in attributes
+    # These are not set on a fresh LogRecord but are rejected by makeRecord()
+    # and populated by formatters.
+    assert "message" in attributes
+    assert "asctime" in attributes
 
 
 def test__get_builtin_logrecord_attributes_excludes_private_attributes() -> None:

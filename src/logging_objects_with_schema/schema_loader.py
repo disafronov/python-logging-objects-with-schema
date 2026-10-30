@@ -645,10 +645,15 @@ def _get_builtin_logrecord_attributes() -> set[str]:
     Returns:
         Set of attribute names that are reserved by the logging system.
         Examples include: 'name', 'levelno', 'pathname', 'lineno', 'msg', etc.
+        Also includes 'message' and 'asctime', which are not set on a fresh
+        LogRecord instance but are rejected by Logger.makeRecord() and
+        populated by formatters.
 
     Example:
         >>> forbidden = _get_builtin_logrecord_attributes()
         >>> "name" in forbidden
+        True
+        >>> "message" in forbidden
         True
         >>> "ServicePayload" in forbidden
         False
@@ -671,6 +676,12 @@ def _get_builtin_logrecord_attributes() -> set[str]:
         attr_value = getattr(record, attr_name, None)
         if not callable(attr_value):
             forbidden.add(attr_name)
+
+    # makeRecord() rejects these names even though dir(record) does not list
+    # them: both "message" and "asctime" are set by Formatter.format() before
+    # formatting. Without this, such root keys would pass schema validation
+    # and later raise KeyError when a log record is created.
+    forbidden.update({"message", "asctime"})
 
     return forbidden
 
