@@ -220,8 +220,10 @@ An example of a valid empty schema (no leaves, no problems):
 - **`item_type`**: Optional field for list-typed leaves. Must be a string if
   present. See "List-typed fields" section below.
 - **Root key restrictions**: Root keys cannot conflict with standard `logging`
-  module fields (e.g., `name`, `levelno`, `pathname`). Such conflicts cause
-  schema validation to fail.
+  module fields (e.g., `name`, `levelno`, `pathname`). This includes the
+  `message` and `asctime` fields, which are populated by formatters and are
+  rejected by `logging.Logger.makeRecord()`. Such conflicts cause schema
+  validation to fail.
 
 **List-typed fields:**
 
