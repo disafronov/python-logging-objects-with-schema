@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4...v1.0.5) (2026-11-03)
+
+### Bug Fixes
+
+* **ci:** correct bash regex escaping in tag validation ([561d1da](https://github.com/disafronov/python-logging-objects-with-schema/commit/561d1daef9a011e6d6b2a896b3002b9e2679898b))
+* **ci:** correct bash regex escaping in tag validation ([2485999](https://github.com/disafronov/python-logging-objects-with-schema/commit/248599901a2bb395a06237b8bd0168dcdd450bb1))
+
 ## [1.0.4](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.3...v1.0.4) (2026-10-30)
 
 ### Bug Fixes
