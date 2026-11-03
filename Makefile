@@ -40,7 +40,7 @@ dead-code: ## Check for dead code using vulture
 
 audit: ## Check dependencies for known vulnerabilities
 	@echo "Auditing dependencies..."
-	$(UV_RUN) --with pip-audit pip-audit
+	$(UV_RUN) pip-audit
 
 # Testing
 test: ## Run tests with coverage
