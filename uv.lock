@@ -726,7 +726,7 @@ wheels = [
 
 [[package]]
 name = "logging-objects-with-schema"
-version = "1.0.5"
+version = "1.0.6"
 source = { editable = "." }
 
 [package.dev-dependencies]

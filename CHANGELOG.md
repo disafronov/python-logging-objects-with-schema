@@ -1,3 +1,13 @@
+## [1.0.6](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.5...v1.0.6) (2026-11-03)
+
+### Bug Fixes
+
+* use locked pip-audit from project dependencies ([50e234f](https://github.com/disafronov/python-logging-objects-with-schema/commit/50e234f26165a4d7708101715a8a983ebbd6ff83))
+
+### Code Refactoring
+
+* deps ([55f2511](https://github.com/disafronov/python-logging-objects-with-schema/commit/55f2511d6459cf1f3c2207ad6d265a8d2cb5fc06))
+
 ## [1.0.5](https://github.com/disafronov/python-logging-objects-with-schema/compare/v1.0.4...v1.0.5) (2026-11-03)
 
 ### Bug Fixes
